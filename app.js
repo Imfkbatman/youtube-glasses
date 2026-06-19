@@ -424,7 +424,7 @@ function formatApiError(error) {
     return 'API key не найден. Откройте сайт один раз через ссылку с #key=...';
   }
   if (error.status === 400) {
-    return 'YouTube API отклонил запрос. Проверьте API key.';
+    return `YouTube API отклонил запрос: ${error.message}. Проверьте, что после ?key= указан полный новый ключ.`;
   }
   if (error.status === 403) {
     if (error.reason === 'refererNotAllowedMapError' || error.message.includes('referer')) {
