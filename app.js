@@ -109,9 +109,10 @@ function consumeApiKeyFromUrl() {
   const key = (hash.get('key') || hash.get('apiKey') || query.get('key') || query.get('apiKey') || '').trim();
   if (!key) return '';
 
-  localStorage.setItem(STORAGE_KEYS.apiKey, key);
-  if (window.history?.replaceState) {
-    window.history.replaceState(null, document.title, window.location.pathname);
+  try {
+    localStorage.setItem(STORAGE_KEYS.apiKey, key);
+  } catch (error) {
+    // Some glasses WebViews block or clear localStorage; keep using the URL key for this session.
   }
   window.__ytgKeyLoadedFromUrl = true;
   return key;
