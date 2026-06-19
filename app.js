@@ -272,12 +272,20 @@ function extractVideoId(text) {
 }
 
 function videoUrl(id) {
-  if (!id) return 'https://m.youtube.com';
-  return `https://m.youtube.com/watch?v=${encodeURIComponent(id)}`;
+  if (!id) return 'https://www.youtube.com';
+  return `https://www.youtube.com/watch?v=${encodeURIComponent(id)}`;
+}
+
+function shortsUrl(id) {
+  return `https://www.youtube.com/shorts/${encodeURIComponent(id)}`;
+}
+
+function videoOpenUrl(video) {
+  return video.kind === 'shorts' ? shortsUrl(video.id) : videoUrl(video.id);
 }
 
 function searchUrl(query) {
-  return `https://m.youtube.com/results?search_query=${encodeURIComponent(query || '')}`;
+  return `https://www.youtube.com/results?search_query=${encodeURIComponent(query || '')}`;
 }
 
 function getVisibleSearchInput() {
@@ -398,7 +406,8 @@ function renderVideoList(container, videos, emptyText) {
   normalizedVideos.slice(0, 12).forEach(video => {
     const card = document.createElement('a');
     card.className = 'video-card focusable';
-    card.href = videoUrl(video.id);
+    card.href = videoOpenUrl(video);
+    card.target = '_top';
     card.dataset.video = JSON.stringify(video);
     card.rel = 'noopener';
     card.innerHTML = `
@@ -588,7 +597,7 @@ async function runSearch({ append = false } = {}) {
       return haystack.includes(query.toLowerCase());
     });
     setStatus(searchStatus, 'API key не найден. Откройте сайт через ссылку с ?key=...');
-    renderVideoList(searchResults, localMatches, 'Нажмите YouTube для поиска на m.youtube.com');
+    renderVideoList(searchResults, localMatches, 'Нажмите YouTube для поиска на youtube.com');
     moreResultsButton.hidden = true;
     return;
   }
@@ -643,7 +652,7 @@ function playVideo(video) {
   upsertHistory(normalized);
 
   if (state.settings.playerMode === 'youtube') {
-    window.location.href = videoUrl(normalized.id);
+    window.top.location.href = videoOpenUrl(normalized);
     return;
   }
 
@@ -685,13 +694,13 @@ async function requestFullscreen() {
 }
 
 function openCurrentVideo() {
-  const target = state.currentVideo ? videoUrl(state.currentVideo.id) : 'https://m.youtube.com';
-  window.location.href = target;
+  const target = state.currentVideo ? videoOpenUrl(state.currentVideo) : 'https://www.youtube.com';
+  window.top.location.href = target;
 }
 
 function openYouTubeSearch() {
   const query = getSearchQuery();
-  window.location.href = query ? searchUrl(query) : 'https://m.youtube.com';
+  window.top.location.href = query ? searchUrl(query) : 'https://www.youtube.com';
 }
 
 function renderLibrary() {
