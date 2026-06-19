@@ -1,0 +1,73 @@
+* { box-sizing: border-box; }
+html, body {
+  margin: 0;
+  width: 600px;
+  height: 600px;
+  overflow: hidden;
+  background: #000;
+  color: #fff;
+  font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+}
+.screen {
+  display: none;
+  width: 600px;
+  height: 600px;
+  padding: 34px;
+}
+.screen.active { display: block; }
+h1 {
+  margin: 0 0 16px;
+  font-size: 42px;
+  line-height: 1.05;
+}
+.hint {
+  font-size: 22px;
+  opacity: .85;
+  margin-bottom: 28px;
+}
+input, button {
+  width: 100%;
+  border-radius: 22px;
+  border: 3px solid #555;
+  background: #111;
+  color: white;
+  font-size: 26px;
+  padding: 20px;
+  margin: 10px 0;
+  outline: none;
+}
+button {
+  font-weight: 700;
+}
+.focused, input:focus, button:focus {
+  border-color: white;
+  background: #2a2a2a;
+  transform: scale(1.02);
+}
+.quick {
+  margin-top: 18px;
+}
+.small {
+  font-size: 18px;
+  opacity: .65;
+  margin-top: 22px;
+}
+#player {
+  padding: 0;
+  position: relative;
+}
+iframe {
+  width: 600px;
+  height: 600px;
+  border: 0;
+  background: #000;
+}
+.overlay {
+  position: absolute;
+  left: 18px;
+  bottom: 18px;
+  width: 190px;
+  padding: 14px;
+  font-size: 22px;
+  background: rgba(0,0,0,.72);
+}
