@@ -7,8 +7,6 @@ const STORAGE_KEYS = {
   favorites: 'ytg.favorites'
 };
 
-const BUILT_IN_YOUTUBE_API_KEY = 'AIzaSyAmC3IXCSwIyz-4_kl8sLMv470B47cTod4';
-
 const starterVideos = [
   {
     id: 'dQw4w9WgXcQ',
@@ -105,8 +103,21 @@ function safeParse(value, fallback) {
   }
 }
 
+function consumeApiKeyFromUrl() {
+  const hash = new URLSearchParams(window.location.hash.replace(/^#/, ''));
+  const query = new URLSearchParams(window.location.search);
+  const key = (hash.get('key') || hash.get('apiKey') || query.get('key') || query.get('apiKey') || '').trim();
+  if (!key) return '';
+
+  localStorage.setItem(STORAGE_KEYS.apiKey, key);
+  if (window.history?.replaceState) {
+    window.history.replaceState(null, document.title, window.location.pathname);
+  }
+  return key;
+}
+
 function loadState() {
-  state.settings.apiKey = localStorage.getItem(STORAGE_KEYS.apiKey) || BUILT_IN_YOUTUBE_API_KEY;
+  state.settings.apiKey = consumeApiKeyFromUrl() || localStorage.getItem(STORAGE_KEYS.apiKey) || '';
   state.settings.clientId = localStorage.getItem(STORAGE_KEYS.clientId) || '';
   state.settings.region = localStorage.getItem(STORAGE_KEYS.region) || 'US';
   state.settings.fullscreen = localStorage.getItem(STORAGE_KEYS.fullscreen) !== 'false';
@@ -365,8 +376,12 @@ function renderFallbackTrends(message = 'Локальная подборка. Д
   renderVideoList(trendGrid, starterVideos, 'Нет видео для показа');
 }
 
+function getApiKey() {
+  return state.settings.apiKey;
+}
+
 function apiReady() {
-  return Boolean(state.googleToken || state.settings.apiKey);
+  return Boolean(state.googleToken || getApiKey());
 }
 
 async function youtubeFetch(endpoint, params) {
@@ -383,7 +398,7 @@ async function youtubeFetch(endpoint, params) {
   if (state.googleToken) {
     options.headers = { Authorization: `Bearer ${state.googleToken}` };
   } else {
-    url.searchParams.set('key', state.settings.apiKey);
+    url.searchParams.set('key', getApiKey());
   }
 
   const response = await fetch(url, options);
@@ -412,7 +427,7 @@ function normalizeSearchItems(items, kind = state.searchMode) {
 
 async function loadTrends() {
   if (!apiReady()) {
-    renderFallbackTrends();
+    renderFallbackTrends('Показываю подборку. Live-тренды включатся автоматически, когда API будет доступен.');
     return;
   }
 
@@ -428,7 +443,7 @@ async function loadTrends() {
     setStatus(trendStatus, `Регион: ${state.settings.region}`);
     renderVideoList(trendGrid, videos, 'Тренды не загрузились');
   } catch (error) {
-    renderFallbackTrends('Не удалось загрузить live-тренды. Показываю локальную подборку.');
+    renderFallbackTrends('Live-тренды сейчас недоступны. Показываю подборку и быстрый поиск.');
   }
 }
 
@@ -461,7 +476,7 @@ async function runSearch() {
       const haystack = `${video.title} ${video.channel}`.toLowerCase();
       return haystack.includes(query.toLowerCase());
     });
-    setStatus(searchStatus, 'Без API key доступен локальный поиск и переход в YouTube');
+    setStatus(searchStatus, 'Live-поиск недоступен. Можно открыть запрос в YouTube.');
     renderVideoList(searchResults, localMatches, 'Нажмите YouTube для поиска на m.youtube.com');
     return;
   }
@@ -477,9 +492,18 @@ async function runSearch() {
     setStatus(searchStatus, state.searchMode === 'shorts' ? 'Результаты Shorts' : 'Результаты YouTube');
     renderVideoList(searchResults, videos, 'Ничего не найдено');
   } catch (error) {
-    setStatus(searchStatus, 'Поиск YouTube недоступен. Проверьте ключ или вход Google.');
+    setStatus(searchStatus, 'Live-поиск YouTube недоступен. Нажмите YouTube для поиска на сайте.');
     renderVideoList(searchResults, [], 'Нет результатов');
   }
+}
+
+function runQuickSearch(button) {
+  const query = button.dataset.query || '';
+  if (button.dataset.kind) {
+    selectSearchMode(button.dataset.kind);
+  }
+  syncSearchInputs(query);
+  runSearch();
 }
 
 function playVideo(video) {
@@ -690,6 +714,9 @@ function bindEvents() {
   });
   document.querySelectorAll('[data-library-mode]').forEach(button => {
     button.addEventListener('click', () => selectLibraryMode(button.dataset.libraryMode));
+  });
+  document.querySelectorAll('[data-query]').forEach(button => {
+    button.addEventListener('click', () => runQuickSearch(button));
   });
 
   document.addEventListener('keydown', event => {

@@ -145,7 +145,7 @@ button {
   grid-template-columns: 1fr 86px 94px;
   gap: 8px;
   height: 58px;
-  margin-bottom: 10px;
+  margin-bottom: 8px;
 }
 
 input,
@@ -210,6 +210,29 @@ h1 {
   margin-bottom: 10px;
 }
 
+.quick-searches {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  height: 38px;
+  margin-bottom: 8px;
+}
+
+.quick-chip {
+  min-width: 0;
+  height: 38px;
+  padding: 0 8px;
+  border-radius: 12px;
+  background: rgba(77, 212, 255, .14);
+  border: 2px solid rgba(77, 212, 255, .22);
+  color: #e9faff;
+  font-size: 14px;
+  font-weight: 800;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .chip.active,
 .dock-button.active {
   background: rgba(46, 229, 157, .16);
@@ -227,11 +250,11 @@ h1 {
 }
 
 #home .video-list {
-  height: 328px;
+  height: 282px;
 }
 
 #search .video-list {
-  height: 276px;
+  height: 230px;
 }
 
 .video-list::-webkit-scrollbar {

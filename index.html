@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=600, height=600, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <meta name="theme-color" content="#050505" />
   <title>YouTube Glass</title>
-  <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="style.css?v=20260620-3" />
 </head>
 <body>
   <main id="app" aria-live="polite">
@@ -23,6 +23,13 @@
         <input id="searchInput" class="focusable" data-search-input type="text" inputmode="search" enterkeyhint="search" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Видео, Shorts или ссылка" />
         <button id="voiceButton" class="compact focusable" type="button">Голос</button>
         <button id="searchButton" class="primary focusable" type="button">Поиск</button>
+      </div>
+
+      <div class="quick-searches" aria-label="Быстрый поиск">
+        <button class="quick-chip focusable" type="button" data-query="music">Музыка</button>
+        <button class="quick-chip focusable" type="button" data-query="news today">Новости</button>
+        <button class="quick-chip focusable" type="button" data-query="sports highlights">Спорт</button>
+        <button class="quick-chip focusable" type="button" data-query="science">Наука</button>
       </div>
 
       <div class="section-title">
@@ -44,6 +51,13 @@
         <input id="searchInputSearch" class="focusable" data-search-input type="text" inputmode="search" enterkeyhint="search" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Видео, Shorts или ссылка" />
         <button id="voiceButtonSearch" class="compact focusable" type="button">Голос</button>
         <button id="searchButtonSearch" class="primary focusable" type="button">Поиск</button>
+      </div>
+
+      <div class="quick-searches" aria-label="Быстрый поиск">
+        <button class="quick-chip focusable" type="button" data-query="lofi music">Lofi</button>
+        <button class="quick-chip focusable" type="button" data-query="latest tech">Tech</button>
+        <button class="quick-chip focusable" type="button" data-query="travel shorts" data-kind="shorts">Shorts</button>
+        <button class="quick-chip focusable" type="button" data-query="gaming">Gaming</button>
       </div>
 
       <div class="filter-row" role="group" aria-label="Фильтр поиска">
@@ -133,6 +147,6 @@
     <div id="toast" class="toast" role="status" aria-live="polite"></div>
   </main>
 
-  <script src="app.js"></script>
+  <script src="app.js?v=20260620-3"></script>
 </body>
 </html>
