@@ -7,6 +7,8 @@ const STORAGE_KEYS = {
   favorites: 'ytg.favorites'
 };
 
+const BUILT_IN_YOUTUBE_API_KEY = 'AIzaSyAmC3IXCSwIyz-4_kl8sLMv470B47cTod4';
+
 const starterVideos = [
   {
     id: 'dQw4w9WgXcQ',
@@ -104,7 +106,7 @@ function safeParse(value, fallback) {
 }
 
 function loadState() {
-  state.settings.apiKey = localStorage.getItem(STORAGE_KEYS.apiKey) || '';
+  state.settings.apiKey = localStorage.getItem(STORAGE_KEYS.apiKey) || BUILT_IN_YOUTUBE_API_KEY;
   state.settings.clientId = localStorage.getItem(STORAGE_KEYS.clientId) || '';
   state.settings.region = localStorage.getItem(STORAGE_KEYS.region) || 'US';
   state.settings.fullscreen = localStorage.getItem(STORAGE_KEYS.fullscreen) !== 'false';

@@ -9,7 +9,7 @@ Ray-Ban Meta Display YouTube Web App
 
 Что добавлено:
 - поиск по ссылке, video ID и YouTube Data API;
-- главная страница с live-трендами YouTube при наличии API key;
+- главная страница с live-трендами YouTube через встроенный API key;
 - режим Shorts с вертикальным плеером;
 - запрос fullscreen после пользовательского жеста;
 - избранное и история просмотров в localStorage;
@@ -18,9 +18,8 @@ Ray-Ban Meta Display YouTube Web App
 - голосовой поиск через Web Speech API, если WebView его поддерживает.
 
 Настройка YouTube Data API:
-1. Создай API key в Google Cloud Console.
-2. Включи YouTube Data API v3.
-3. Вставь ключ в настройках приложения.
+API key уже встроен в app.js для удобного запуска на очках.
+Если нужно заменить ключ, открой настройки приложения и вставь новый ключ в поле YouTube API key.
 
 Настройка Google входа:
 1. Создай OAuth Client ID для Web application в Google Cloud Console.
