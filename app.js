@@ -396,11 +396,12 @@ function renderVideoList(container, videos, emptyText) {
   }
 
   normalizedVideos.slice(0, 12).forEach(video => {
-    const button = document.createElement('button');
-    button.className = 'video-card focusable';
-    button.type = 'button';
-    button.dataset.video = JSON.stringify(video);
-    button.innerHTML = `
+    const card = document.createElement('a');
+    card.className = 'video-card focusable';
+    card.href = videoUrl(video.id);
+    card.dataset.video = JSON.stringify(video);
+    card.rel = 'noopener';
+    card.innerHTML = `
       <span class="thumb">
         <img src="${video.thumb}" alt="" loading="lazy" />
         <span class="badge">${video.kind === 'shorts' ? 'Shorts' : 'Play'}</span>
@@ -411,10 +412,16 @@ function renderVideoList(container, videos, emptyText) {
       </span>
       <span class="video-action">›</span>
     `;
-    button.querySelector('.video-title').textContent = video.title;
-    button.querySelector('.video-channel').textContent = video.channel;
-    button.addEventListener('click', () => playVideo(video));
-    container.appendChild(button);
+    card.querySelector('.video-title').textContent = video.title;
+    card.querySelector('.video-channel').textContent = video.channel;
+    card.addEventListener('click', event => {
+      upsertHistory(video);
+      if (state.settings.playerMode === 'embed') {
+        event.preventDefault();
+        playVideo(video);
+      }
+    });
+    container.appendChild(card);
   });
 
   refreshFocusables(true);
@@ -750,7 +757,7 @@ function getVoiceSupportMessage() {
   const hasSpeech = Boolean(getSpeechRecognition());
   const hasMedia = Boolean(navigator.mediaDevices?.getUserMedia);
   if (hasSpeech) {
-    return 'Голос: Web Speech доступен. Нажмите Голос и говорите.';
+    return `Голос: Web Speech доступен (${getVoiceLanguage()}). Нажмите Голос и говорите.`;
   }
   if (hasMedia) {
     return 'Голос: микрофон есть, но Web Speech нет. Нужен backend для распознавания.';
@@ -767,6 +774,28 @@ async function checkVoiceSupport() {
   const message = getVoiceSupportMessage();
   setSettingsStatus(message);
   toastMessage(message);
+}
+
+function getVoiceLanguage() {
+  if (state.settings.region === 'RU') return 'ru-RU';
+  if (state.settings.region === 'TR') return 'tr-TR';
+  if (state.settings.region === 'DE') return 'de-DE';
+  if (state.settings.region === 'FR') return 'fr-FR';
+  return 'en-US';
+}
+
+function getVoiceErrorMessage(error) {
+  const code = error?.error || 'unknown';
+  const messages = {
+    'no-speech': 'Голос: не услышал речь. Говорите сразу после нажатия.',
+    'audio-capture': 'Голос: микрофон недоступен для WebView.',
+    'not-allowed': 'Голос: нет разрешения на микрофон.',
+    'service-not-allowed': 'Голос: сервис распознавания запрещен в этом WebView.',
+    'network': 'Голос: ошибка сети распознавания.',
+    'aborted': 'Голос: распознавание остановлено.',
+    'language-not-supported': 'Голос: язык ru-RU не поддержан этим WebView.'
+  };
+  return messages[code] || `Голос: ошибка ${code}`;
 }
 
 function loadGoogleScript() {
@@ -828,19 +857,29 @@ function startVoiceSearch() {
   }
 
   const recognition = new SpeechRecognition();
-  recognition.lang = navigator.language?.startsWith('ru') ? 'ru-RU' : 'en-US';
+  recognition.lang = getVoiceLanguage();
   recognition.interimResults = false;
   recognition.maxAlternatives = 1;
-  toastMessage('Слушаю...');
+  setStatus(searchStatus, `Слушаю (${recognition.lang})...`);
+  toastMessage(`Слушаю ${recognition.lang}`);
   recognition.onresult = event => {
     const transcript = event.results?.[0]?.[0]?.transcript || '';
-    syncSearchInputs(transcript);
-    runSearch();
+    if (transcript.trim()) {
+      syncSearchInputs(transcript.trim());
+      runSearch();
+    } else {
+      setStatus(searchStatus, 'Голос: пустой результат');
+      toastMessage('Пустой результат');
+    }
+  };
+  recognition.onnomatch = () => {
+    setStatus(searchStatus, 'Голос: не удалось сопоставить речь с текстом');
+    toastMessage('Не распознано');
   };
   recognition.onerror = event => {
-    const reason = event?.error ? `: ${event.error}` : '';
-    setStatus(searchStatus, `Не удалось распознать голос${reason}`);
-    toastMessage('Голос не распознан');
+    const message = getVoiceErrorMessage(event);
+    setStatus(searchStatus, message);
+    toastMessage(message);
   };
   recognition.onend = () => {
     if (!getSearchQuery()) setStatus(searchStatus, 'Голос остановлен');

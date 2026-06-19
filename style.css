@@ -299,6 +299,7 @@ h1 {
   border: 2px solid rgba(255, 255, 255, .08);
   color: var(--text);
   text-align: left;
+  text-decoration: none;
 }
 
 .thumb {
