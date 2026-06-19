@@ -382,6 +382,15 @@ function getApiKey() {
   return state.settings.apiKey;
 }
 
+function describeApiKey() {
+  const key = getApiKey();
+  if (!key) return 'ключ отсутствует';
+  const compact = key.replace(/\s+/g, '');
+  const prefix = compact.slice(0, 6);
+  const suffix = compact.slice(-4);
+  return `${prefix}...${suffix}, ${compact.length} симв.`;
+}
+
 function apiReady() {
   return Boolean(state.googleToken || getApiKey());
 }
@@ -424,7 +433,7 @@ function formatApiError(error) {
     return 'API key не найден. Откройте сайт один раз через ссылку с #key=...';
   }
   if (error.status === 400) {
-    return `YouTube API отклонил запрос: ${error.message}. Проверьте, что после ?key= указан полный новый ключ.`;
+    return `400: ${error.message}. ${describeApiKey()}`;
   }
   if (error.status === 403) {
     if (error.reason === 'refererNotAllowedMapError' || error.message.includes('referer')) {
@@ -436,7 +445,7 @@ function formatApiError(error) {
     if (error.reason === 'accessNotConfigured') {
       return 'YouTube Data API v3 не включен для этого проекта.';
     }
-    return 'YouTube API вернул 403. Скорее всего ключ заблокирован или ограничение сайта неверное.';
+    return `403: ключ заблокирован или ограничение сайта неверное. ${describeApiKey()}`;
   }
   if (error.status === 429) {
     return 'Слишком много запросов к YouTube API. Попробуйте позже.';
