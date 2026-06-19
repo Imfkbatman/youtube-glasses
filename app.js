@@ -233,6 +233,10 @@ function syncSearchInputs(value) {
   });
 }
 
+function isTextEntry(element) {
+  return Boolean(element?.matches?.('input, textarea, select, [contenteditable="true"]'));
+}
+
 function getActiveFocusScope() {
   return screens[state.activeScreen];
 }
@@ -258,6 +262,16 @@ function refreshFocusables(keepIndex = false) {
     state.focusIndex = Math.max(0, Math.min(state.focusIndex, state.focusables.length - 1));
     setFocus(state.focusIndex);
   }
+}
+
+function focusPreferredForScreen(name) {
+  const preferred = {
+    home: searchInput,
+    search: searchInputSearch
+  }[name];
+  if (!preferred || preferred.offsetParent === null) return;
+  const index = state.focusables.indexOf(preferred);
+  if (index >= 0) setFocus(index);
 }
 
 function setFocus(index) {
@@ -291,6 +305,7 @@ function showScreen(name) {
   });
 
   refreshFocusables();
+  focusPreferredForScreen(name);
 }
 
 function goBack() {
@@ -474,6 +489,11 @@ function playVideo(video) {
   upsertHistory(normalized);
   updateFavoriteButton();
   showScreen('player');
+  window.setTimeout(() => {
+    if (state.activeScreen === 'player') {
+      toastMessage('Если видео не стартует, нажмите YouTube');
+    }
+  }, 1800);
   if (state.settings.fullscreen) {
     requestFullscreen();
   }
@@ -607,8 +627,14 @@ function startVoiceSearch() {
   const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
   const activeInput = getVisibleSearchInput();
   activeInput.focus({ preventScroll: true });
+  activeInput.select();
   if (!SpeechRecognition) {
-    toastMessage('Голосовой ввод недоступен в этом WebView');
+    toastMessage('Поле активно. Используйте диктовку Meta AI или системную клавиатуру.');
+    const fallback = window.prompt('Голосовой API недоступен в этом браузере. Введите или продиктуйте запрос здесь:', activeInput.value);
+    if (fallback && fallback.trim()) {
+      syncSearchInputs(fallback.trim());
+      runSearch();
+    }
     return;
   }
 
@@ -665,6 +691,14 @@ function bindEvents() {
   });
 
   document.addEventListener('keydown', event => {
+    if (isTextEntry(event.target)) {
+      if (event.key === 'Enter') {
+        event.preventDefault();
+        runSearch();
+      }
+      return;
+    }
+
     if (event.key === 'ArrowDown' || event.key === 'ArrowRight') {
       event.preventDefault();
       moveFocus(1);
@@ -690,6 +724,7 @@ function bindEvents() {
     startY = event.clientY;
   });
   app.addEventListener('pointerup', event => {
+    if (isTextEntry(event.target)) return;
     const dx = event.clientX - startX;
     const dy = event.clientY - startY;
     const horizontal = Math.abs(dx) > Math.abs(dy);
