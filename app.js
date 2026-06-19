@@ -403,9 +403,43 @@ async function youtubeFetch(endpoint, params) {
 
   const response = await fetch(url, options);
   if (!response.ok) {
-    throw new Error(`youtube-${response.status}`);
+    let detail = null;
+    try {
+      detail = await response.json();
+    } catch (error) {
+      detail = null;
+    }
+    const apiError = new Error(detail?.error?.message || `youtube-${response.status}`);
+    apiError.status = response.status;
+    apiError.reason = detail?.error?.errors?.[0]?.reason || detail?.error?.status || '';
+    throw apiError;
   }
   return response.json();
+}
+
+function formatApiError(error) {
+  if (error.message === 'missing-api') {
+    return 'API key не найден. Откройте сайт один раз через ссылку с #key=...';
+  }
+  if (error.status === 400) {
+    return 'YouTube API отклонил запрос. Проверьте API key.';
+  }
+  if (error.status === 403) {
+    if (error.reason === 'refererNotAllowedMapError' || error.message.includes('referer')) {
+      return 'API key не разрешен для этого сайта. В Google Cloud добавьте https://imfkbatman.github.io/*';
+    }
+    if (error.reason === 'dailyLimitExceeded' || error.reason === 'quotaExceeded') {
+      return 'Квота YouTube API закончилась.';
+    }
+    if (error.reason === 'accessNotConfigured') {
+      return 'YouTube Data API v3 не включен для этого проекта.';
+    }
+    return 'YouTube API вернул 403. Скорее всего ключ заблокирован или ограничение сайта неверное.';
+  }
+  if (error.status === 429) {
+    return 'Слишком много запросов к YouTube API. Попробуйте позже.';
+  }
+  return `YouTube API ошибка: ${error.message || 'неизвестно'}`;
 }
 
 function normalizeSearchItems(items, kind = state.searchMode) {
@@ -443,7 +477,7 @@ async function loadTrends() {
     setStatus(trendStatus, `Регион: ${state.settings.region}`);
     renderVideoList(trendGrid, videos, 'Тренды не загрузились');
   } catch (error) {
-    renderFallbackTrends('Live-тренды сейчас недоступны. Показываю подборку и быстрый поиск.');
+    renderFallbackTrends(`${formatApiError(error)} Показываю подборку.`);
   }
 }
 
@@ -492,7 +526,7 @@ async function runSearch() {
     setStatus(searchStatus, state.searchMode === 'shorts' ? 'Результаты Shorts' : 'Результаты YouTube');
     renderVideoList(searchResults, videos, 'Ничего не найдено');
   } catch (error) {
-    setStatus(searchStatus, 'Live-поиск YouTube недоступен. Нажмите YouTube для поиска на сайте.');
+    setStatus(searchStatus, formatApiError(error));
     renderVideoList(searchResults, [], 'Нет результатов');
   }
 }
