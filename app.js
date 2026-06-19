@@ -1,1012 +1,1007 @@
-const STORAGE_KEYS = {
-  apiKey: 'ytg.apiKey',
-  clientId: 'ytg.clientId',
-  region: 'ytg.region',
-  playerMode: 'ytg.playerMode',
-  fullscreen: 'ytg.fullscreen',
-  history: 'ytg.history',
-  favorites: 'ytg.favorites',
-  queries: 'ytg.queries'
-};
+(function () {
+  'use strict';
 
-const starterVideos = [
-  {
-    id: 'dQw4w9WgXcQ',
-    title: 'Classic music video',
-    channel: 'YouTube',
-    kind: 'video'
-  },
-  {
-    id: 'M7lc1UVf-VE',
-    title: 'YouTube embedded player demo',
-    channel: 'Google for Developers',
-    kind: 'video'
-  },
-  {
-    id: 'jNQXAC9IVRw',
-    title: 'Me at the zoo',
-    channel: 'jawed',
-    kind: 'shorts'
-  },
-  {
-    id: 'kJQP7kiw5Fk',
-    title: 'Global music hit',
-    channel: 'YouTube',
-    kind: 'video'
-  }
-];
-
-const screens = {
-  home: document.getElementById('home'),
-  search: document.getElementById('search'),
-  library: document.getElementById('library'),
-  settings: document.getElementById('settings'),
-  player: document.getElementById('player')
-};
-
-const app = document.getElementById('app');
-const searchInput = document.getElementById('searchInput');
-const searchInputSearch = document.getElementById('searchInputSearch');
-const searchButton = document.getElementById('searchButton');
-const searchButtonSearch = document.getElementById('searchButtonSearch');
-const voiceButton = document.getElementById('voiceButton');
-const voiceButtonSearch = document.getElementById('voiceButtonSearch');
-const backButton = document.getElementById('backButton');
-const settingsButton = document.getElementById('settingsButton');
-const refreshTrendsButton = document.getElementById('refreshTrendsButton');
-const openYouTubeSearchButton = document.getElementById('openYouTubeSearchButton');
-const moreResultsButton = document.getElementById('moreResultsButton');
-const clearHistoryButton = document.getElementById('clearHistoryButton');
-const saveSettingsButton = document.getElementById('saveSettingsButton');
-const googleButton = document.getElementById('googleButton');
-const voiceCheckButton = document.getElementById('voiceCheckButton');
-const apiKeyInput = document.getElementById('apiKeyInput');
-const clientIdInput = document.getElementById('clientIdInput');
-const regionSelect = document.getElementById('regionSelect');
-const playerModeSelect = document.getElementById('playerModeSelect');
-const fullscreenToggle = document.getElementById('fullscreenToggle');
-const trendGrid = document.getElementById('trendGrid');
-const trendStatus = document.getElementById('trendStatus');
-const searchResults = document.getElementById('searchResults');
-const searchStatus = document.getElementById('searchStatus');
-const libraryList = document.getElementById('libraryList');
-const libraryStatus = document.getElementById('libraryStatus');
-const settingsStatus = document.getElementById('settingsStatus');
-const frame = document.getElementById('ytFrame');
-const frameShell = document.getElementById('frameShell');
-const playerBackButton = document.getElementById('playerBackButton');
-const favoriteButton = document.getElementById('favoriteButton');
-const fullscreenButton = document.getElementById('fullscreenButton');
-const openVideoButton = document.getElementById('openVideoButton');
-const toast = document.getElementById('toast');
-const searchInputs = [searchInput, searchInputSearch];
-
-const state = {
-  activeScreen: 'home',
-  previousScreen: 'home',
-  focusables: [],
-  focusIndex: 0,
-  searchMode: 'video',
-  searchOrder: 'relevance',
-  searchPageToken: '',
-  lastSearchQuery: '',
-  libraryMode: 'history',
-  googleToken: '',
-  currentVideo: null,
-  settings: {
-    apiKey: '',
-    clientId: '',
-    region: 'RU',
-    playerMode: 'youtube',
-    fullscreen: true
-  },
-  history: [],
-  favorites: [],
-  queries: []
-};
-
-function safeParse(value, fallback) {
-  try {
-    return JSON.parse(value) ?? fallback;
-  } catch (error) {
-    return fallback;
-  }
-}
-
-function getUrlValue(...names) {
-  const hash = new URLSearchParams(window.location.hash.replace(/^#/, ''));
-  const query = new URLSearchParams(window.location.search);
-  for (const name of names) {
-    const value = (query.get(name) || hash.get(name) || '').trim();
-    if (value) return value;
-  }
-  return '';
-}
-
-function consumeApiKeyFromUrl() {
-  const key = getUrlValue('key', 'apiKey');
-  if (!key) return '';
-
-  try {
-    localStorage.setItem(STORAGE_KEYS.apiKey, key);
-  } catch (error) {
-    // Some glasses WebViews block or clear localStorage; keep using the URL key for this session.
-  }
-  window.__ytgKeyLoadedFromUrl = true;
-  return key;
-}
-
-function consumeClientIdFromUrl() {
-  const clientId = getUrlValue('client_id', 'clientId');
-  if (!clientId) return '';
-
-  try {
-    localStorage.setItem(STORAGE_KEYS.clientId, clientId);
-  } catch (error) {
-    // Keep it in memory if the glasses WebView does not persist localStorage.
-  }
-  window.__ytgClientLoadedFromUrl = true;
-  return clientId;
-}
-
-function getUrlPlayerMode() {
-  const mode = getUrlValue('player', 'playerMode');
-  return mode === 'embed' || mode === 'youtube' ? mode : '';
-}
-
-function getUrlRegion() {
-  const region = getUrlValue('region').toUpperCase();
-  return /^[A-Z]{2}$/.test(region) ? region : '';
-}
-
-function loadState() {
-  state.settings.apiKey = consumeApiKeyFromUrl() || localStorage.getItem(STORAGE_KEYS.apiKey) || '';
-  state.settings.clientId = consumeClientIdFromUrl() || localStorage.getItem(STORAGE_KEYS.clientId) || '';
-  state.settings.region = getUrlRegion() || localStorage.getItem(STORAGE_KEYS.region) || 'RU';
-  state.settings.playerMode = getUrlPlayerMode() || localStorage.getItem(STORAGE_KEYS.playerMode) || 'youtube';
-  state.settings.fullscreen = localStorage.getItem(STORAGE_KEYS.fullscreen) !== 'false';
-  state.history = safeParse(localStorage.getItem(STORAGE_KEYS.history), []);
-  state.favorites = safeParse(localStorage.getItem(STORAGE_KEYS.favorites), []);
-  state.queries = safeParse(localStorage.getItem(STORAGE_KEYS.queries), []);
-
-  apiKeyInput.value = state.settings.apiKey;
-  clientIdInput.value = state.settings.clientId;
-  regionSelect.value = state.settings.region;
-  playerModeSelect.value = state.settings.playerMode;
-  fullscreenToggle.checked = state.settings.fullscreen;
-}
-
-function persistSettings() {
-  state.settings.apiKey = apiKeyInput.value.trim();
-  state.settings.clientId = clientIdInput.value.trim();
-  state.settings.region = regionSelect.value;
-  state.settings.playerMode = playerModeSelect.value;
-  state.settings.fullscreen = fullscreenToggle.checked;
-
-  localStorage.setItem(STORAGE_KEYS.apiKey, state.settings.apiKey);
-  localStorage.setItem(STORAGE_KEYS.clientId, state.settings.clientId);
-  localStorage.setItem(STORAGE_KEYS.region, state.settings.region);
-  localStorage.setItem(STORAGE_KEYS.playerMode, state.settings.playerMode);
-  localStorage.setItem(STORAGE_KEYS.fullscreen, String(state.settings.fullscreen));
-}
-
-function persistLibrary() {
-  localStorage.setItem(STORAGE_KEYS.history, JSON.stringify(state.history.slice(0, 40)));
-  localStorage.setItem(STORAGE_KEYS.favorites, JSON.stringify(state.favorites.slice(0, 40)));
-  localStorage.setItem(STORAGE_KEYS.queries, JSON.stringify(state.queries.slice(0, 12)));
-}
-
-function toastMessage(message) {
-  toast.textContent = message;
-  toast.classList.add('visible');
-  window.clearTimeout(toast.dataset.timer);
-  toast.dataset.timer = window.setTimeout(() => toast.classList.remove('visible'), 2400);
-}
-
-function setStatus(element, message) {
-  element.textContent = message || '';
-}
-
-function thumbnailUrl(id) {
-  return `https://i.ytimg.com/vi/${id}/hqdefault.jpg`;
-}
-
-function normalizeVideo(video) {
-  return {
-    id: video.id,
-    title: video.title || 'YouTube video',
-    channel: video.channel || 'YouTube',
-    kind: video.kind === 'shorts' ? 'shorts' : 'video',
-    thumb: video.thumb || thumbnailUrl(video.id)
+  // ==================== CONFIG ====================
+  var CONFIG = {
+    appName: 'YouTube Viewer',
+    storageKey: 'mdg_youtube_viewer',
+    api: {
+      searchUrl: 'https://www.googleapis.com/youtube/v3/search',
+      maxResults: 12,
+      cacheDuration: 5 * 60 * 1000,
+    },
+    recentMax: 5,
   };
-}
 
-function isFavorite(id) {
-  return state.favorites.some(video => video.id === id);
-}
-
-function upsertHistory(video) {
-  const normalized = normalizeVideo(video);
-  state.history = [normalized, ...state.history.filter(item => item.id !== normalized.id)].slice(0, 40);
-  persistLibrary();
-  renderLibrary();
-}
-
-function toggleFavorite(video) {
-  if (!video) return;
-  const normalized = normalizeVideo(video);
-  if (isFavorite(normalized.id)) {
-    state.favorites = state.favorites.filter(item => item.id !== normalized.id);
-    toastMessage('Удалено из избранного');
-  } else {
-    state.favorites = [normalized, ...state.favorites.filter(item => item.id !== normalized.id)].slice(0, 40);
-    toastMessage('Добавлено в избранное');
+  // ==================== EMBEDDED CONFIG (config.js) ====================
+  // Read the shared API key from config.js. Falls back to the per-user key in
+  // localStorage when this isn't set, so anyone bringing their own key still
+  // overrides the embedded default.
+  function getEmbeddedApiKey() {
+    var cfg = window.YOUTUBE_VIEWER_CONFIG;
+    if (!cfg) return '';
+    var k = cfg.EMBEDDED_API_KEY || '';
+    if (!k || k === 'YOUR_API_KEY_HERE') return '';
+    return k;
   }
-  persistLibrary();
-  updateFavoriteButton();
-  renderLibrary();
-}
-
-function extractVideoId(text) {
-  const value = (text || '').trim();
-  if (!value) return '';
-  if (/^[a-zA-Z0-9_-]{11}$/.test(value)) return value;
-
-  try {
-    const url = new URL(value);
-    if (url.hostname.includes('youtu.be')) {
-      return url.pathname.split('/').filter(Boolean)[0]?.slice(0, 11) || '';
-    }
-    if (url.searchParams.get('v')) {
-      return url.searchParams.get('v').slice(0, 11);
-    }
-    const embedMatch = url.pathname.match(/\/embed\/([a-zA-Z0-9_-]{11})/);
-    if (embedMatch) return embedMatch[1];
-    const shortsMatch = url.pathname.match(/\/shorts\/([a-zA-Z0-9_-]{11})/);
-    if (shortsMatch) return shortsMatch[1];
-  } catch (error) {
-    return '';
+  function getEffectiveApiKey() {
+    // Personal key (from settings or URL param) wins over the shared one.
+    return state.data.apiKey || getEmbeddedApiKey();
+  }
+  function isUsingEmbeddedKey() {
+    return !state.data.apiKey && !!getEmbeddedApiKey();
   }
 
-  return '';
-}
+  // ==================== STATE ====================
+  var state = {
+    currentScreen: 'home',
+    screenHistory: [],
+    data: {
+      apiKey: '',
+      recent: [],
+      history: [],       // { id, title, thumb, time }
+    },
+    cache: {},
+    player: null,
+    playerReady: false,
+    currentVideo: null,
+    overlayTimer: null,
+  };
 
-function videoUrl(id) {
-  if (!id) return 'https://www.youtube.com';
-  return `https://www.youtube.com/watch?v=${encodeURIComponent(id)}`;
-}
+  var screens = {};
 
-function shortsUrl(id) {
-  return `https://www.youtube.com/shorts/${encodeURIComponent(id)}`;
-}
-
-function videoOpenUrl(video) {
-  return video.kind === 'shorts' ? shortsUrl(video.id) : videoUrl(video.id);
-}
-
-function searchUrl(query) {
-  return `https://www.youtube.com/results?search_query=${encodeURIComponent(query || '')}`;
-}
-
-function getVisibleSearchInput() {
-  return searchInputs.find(input => input.offsetParent !== null) || searchInput;
-}
-
-function getSearchQuery() {
-  const active = searchInputs.includes(document.activeElement) ? document.activeElement : getVisibleSearchInput();
-  return active.value.trim();
-}
-
-function syncSearchInputs(value) {
-  searchInputs.forEach(input => {
-    if (input.value !== value) input.value = value;
-  });
-}
-
-function isTextEntry(element) {
-  return Boolean(element?.matches?.('input, textarea, select, [contenteditable="true"]'));
-}
-
-function getActiveFocusScope() {
-  return screens[state.activeScreen];
-}
-
-function refreshFocusables(keepIndex = false) {
-  const scope = getActiveFocusScope();
-  const topItems = state.activeScreen === 'player'
-    ? []
-    : Array.from(document.querySelectorAll('.topbar .focusable'));
-  const dockItems = state.activeScreen === 'player'
-    ? []
-    : Array.from(document.querySelectorAll('.dock .focusable'));
-  state.focusables = [
-    ...Array.from(scope.querySelectorAll('.focusable:not([disabled])')),
-    ...dockItems,
-    ...topItems
-  ].filter(element => element.offsetParent !== null);
-
-  if (!keepIndex) {
-    state.focusIndex = 0;
-  }
-  if (state.focusables.length) {
-    state.focusIndex = Math.max(0, Math.min(state.focusIndex, state.focusables.length - 1));
-    setFocus(state.focusIndex);
-  }
-}
-
-function focusPreferredForScreen(name) {
-  const preferred = {
-    home: searchInput,
-    search: searchInputSearch
-  }[name];
-  if (!preferred || preferred.offsetParent === null) return;
-  const index = state.focusables.indexOf(preferred);
-  if (index >= 0) setFocus(index);
-}
-
-function setFocus(index) {
-  state.focusables.forEach(element => element.classList.remove('focused'));
-  if (!state.focusables.length) return;
-  state.focusIndex = (index + state.focusables.length) % state.focusables.length;
-  const element = state.focusables[state.focusIndex];
-  element.classList.add('focused');
-  element.focus({ preventScroll: true });
-}
-
-function moveFocus(delta) {
-  if (!state.focusables.length) refreshFocusables(true);
-  setFocus(state.focusIndex + delta);
-}
-
-function showScreen(name) {
-  if (!screens[name]) return;
-  Object.values(screens).forEach(screen => screen.classList.remove('active'));
-  screens[name].classList.add('active');
-  app.classList.toggle('player-mode', name === 'player');
-  backButton.hidden = name === 'home' || name === 'player';
-  backButton.disabled = backButton.hidden;
-  if (name !== 'player') {
-    state.previousScreen = state.activeScreen === 'player' ? state.previousScreen : state.activeScreen;
-  }
-  state.activeScreen = name;
-
-  document.querySelectorAll('.dock-button').forEach(button => {
-    button.classList.toggle('active', button.dataset.route === name);
-  });
-
-  refreshFocusables();
-  focusPreferredForScreen(name);
-}
-
-function goBack() {
-  if (state.activeScreen === 'player') {
-    closePlayer();
-    return;
-  }
-  if (state.activeScreen === 'settings') {
-    showScreen(state.previousScreen || 'home');
-    return;
-  }
-  showScreen('home');
-}
-
-function renderVideoList(container, videos, emptyText) {
-  container.replaceChildren();
-  const normalizedVideos = videos.map(normalizeVideo).filter(video => video.id);
-
-  if (!normalizedVideos.length) {
-    const empty = document.createElement('div');
-    empty.className = 'empty-state';
-    empty.textContent = emptyText;
-    container.appendChild(empty);
-    refreshFocusables(true);
-    return;
-  }
-
-  normalizedVideos.slice(0, 12).forEach(video => {
-    const card = document.createElement('a');
-    card.className = 'video-card focusable';
-    card.href = videoOpenUrl(video);
-    card.target = '_top';
-    card.dataset.video = JSON.stringify(video);
-    card.rel = 'noopener';
-    card.innerHTML = `
-      <span class="thumb">
-        <img src="${video.thumb}" alt="" loading="lazy" />
-        <span class="badge">${video.kind === 'shorts' ? 'Shorts' : 'Play'}</span>
-      </span>
-      <span class="video-meta">
-        <span class="video-title"></span>
-        <span class="video-channel"></span>
-      </span>
-      <span class="video-action">›</span>
-    `;
-    card.querySelector('.video-title').textContent = video.title;
-    card.querySelector('.video-channel').textContent = video.channel;
-    card.addEventListener('click', event => {
-      upsertHistory(video);
-      if (state.settings.playerMode === 'embed') {
-        event.preventDefault();
-        playVideo(video);
-      }
+  function collectScreens() {
+    document.querySelectorAll('.screen').forEach(function (s) {
+      if (s.id) screens[s.id] = s;
     });
-    container.appendChild(card);
-  });
-
-  refreshFocusables(true);
-}
-
-function renderFallbackTrends(message = 'Локальная подборка. Для живых трендов добавьте YouTube API key.') {
-  setStatus(trendStatus, message);
-  renderVideoList(trendGrid, starterVideos, 'Нет видео для показа');
-}
-
-function getApiKey() {
-  return state.settings.apiKey;
-}
-
-function describeApiKey() {
-  const key = getApiKey();
-  if (!key) return 'ключ отсутствует';
-  const compact = key.replace(/\s+/g, '');
-  const prefix = compact.slice(0, 6);
-  const suffix = compact.slice(-4);
-  return `${prefix}...${suffix}, ${compact.length} симв.`;
-}
-
-function apiReady() {
-  return Boolean(state.googleToken || getApiKey());
-}
-
-async function youtubeFetch(endpoint, params) {
-  if (!apiReady()) {
-    throw new Error('missing-api');
   }
 
-  const url = new URL(`https://www.googleapis.com/youtube/v3/${endpoint}`);
-  Object.entries(params).forEach(([key, value]) => {
-    if (value !== undefined && value !== '') url.searchParams.set(key, value);
-  });
-
-  const options = {};
-  if (state.googleToken) {
-    options.headers = { Authorization: `Bearer ${state.googleToken}` };
-  } else {
-    url.searchParams.set('key', getApiKey());
-  }
-
-  const response = await fetch(url, options);
-  if (!response.ok) {
-    let detail = null;
+  // ==================== STORAGE ====================
+  function loadData() {
     try {
-      detail = await response.json();
-    } catch (error) {
-      detail = null;
+      var saved = localStorage.getItem(CONFIG.storageKey);
+      if (saved) Object.assign(state.data, JSON.parse(saved));
+    } catch (e) {
+      console.error('[Storage] Load error:', e);
     }
-    const apiError = new Error(detail?.error?.message || `youtube-${response.status}`);
-    apiError.status = response.status;
-    apiError.reason = detail?.error?.errors?.[0]?.reason || detail?.error?.status || '';
-    throw apiError;
   }
-  return response.json();
-}
 
-function formatApiError(error) {
-  if (error.message === 'missing-api') {
-    return 'API key не найден. Откройте сайт один раз через ссылку с #key=...';
-  }
-  if (error.status === 400) {
-    return `400: ${error.message}. ${describeApiKey()}`;
-  }
-  if (error.status === 403) {
-    if (error.reason === 'refererNotAllowedMapError' || error.message.includes('referer')) {
-      return 'API key не разрешен для этого сайта. В Google Cloud добавьте https://imfkbatman.github.io/*';
+  function saveData() {
+    try {
+      localStorage.setItem(CONFIG.storageKey, JSON.stringify(state.data));
+    } catch (e) {
+      console.error('[Storage] Save error:', e);
     }
-    if (error.reason === 'dailyLimitExceeded' || error.reason === 'quotaExceeded') {
-      return 'Квота YouTube API закончилась.';
+  }
+
+  // ==================== NAVIGATION ====================
+  function navigateTo(screenId, options) {
+    options = options || {};
+    if (options.addToHistory !== false && state.currentScreen) {
+      state.screenHistory.push(state.currentScreen);
     }
-    if (error.reason === 'accessNotConfigured') {
-      return 'YouTube Data API v3 не включен для этого проекта.';
+    Object.values(screens).forEach(function (s) { s.classList.add('hidden'); });
+    if (screens[screenId]) {
+      screens[screenId].classList.remove('hidden');
+      state.currentScreen = screenId;
+      onScreenEnter(screenId);
+      focusFirst(screens[screenId]);
     }
-    return `403: ключ заблокирован или ограничение сайта неверное. ${describeApiKey()}`;
-  }
-  if (error.status === 429) {
-    return 'Слишком много запросов к YouTube API. Попробуйте позже.';
-  }
-  return `YouTube API ошибка: ${error.message || 'неизвестно'}`;
-}
-
-function normalizeSearchItems(items, kind = state.searchMode) {
-  return items
-    .map(item => {
-      const id = typeof item.id === 'string' ? item.id : item.id?.videoId;
-      const snippet = item.snippet || {};
-      if (!id) return null;
-      return normalizeVideo({
-        id,
-        title: snippet.title,
-        channel: snippet.channelTitle,
-        kind,
-        thumb: snippet.thumbnails?.medium?.url || snippet.thumbnails?.default?.url
-      });
-    })
-    .filter(Boolean);
-}
-
-function rememberQuery(query) {
-  if (!query) return;
-  state.queries = [query, ...state.queries.filter(item => item.toLowerCase() !== query.toLowerCase())].slice(0, 12);
-  persistLibrary();
-}
-
-async function loadTrends() {
-  if (!apiReady()) {
-    renderFallbackTrends('Показываю подборку. Live-тренды включатся автоматически, когда API будет доступен.');
-    return;
   }
 
-  setStatus(trendStatus, 'Загружаю тренды YouTube...');
-  try {
-    const data = await youtubeFetch('videos', {
-      part: 'snippet',
-      chart: 'mostPopular',
-      maxResults: 8,
-      regionCode: state.settings.region
-    });
-    const videos = normalizeSearchItems(data.items || [], 'video');
-    setStatus(trendStatus, `Регион: ${state.settings.region}`);
-    renderVideoList(trendGrid, videos, 'Тренды не загрузились');
-  } catch (error) {
-    renderFallbackTrends(`${formatApiError(error)} Показываю подборку.`);
-  }
-}
-
-async function runSearch({ append = false } = {}) {
-  const query = getSearchQuery();
-  syncSearchInputs(query);
-  if (!query) {
-    showScreen('search');
-    setStatus(searchStatus, 'Введите запрос или ссылку на видео');
-    renderVideoList(searchResults, starterVideos, 'Введите запрос');
-    moreResultsButton.hidden = true;
-    return;
+  function navigateBack() {
+    if (state.currentScreen === 'player') {
+      teardownPlayer();
+    }
+    if (state.screenHistory.length > 0) {
+      navigateTo(state.screenHistory.pop(), { addToHistory: false });
+    }
   }
 
-  const id = extractVideoId(query);
-  if (id) {
-    playVideo({
-      id,
-      title: 'YouTube video',
-      channel: 'Direct link',
-      kind: query.includes('/shorts/') ? 'shorts' : state.searchMode
-    });
-    return;
+  // ==================== FOCUS ====================
+  function focusFirst(container) {
+    var el = container.querySelector('.focusable:not([disabled]):not(.hidden)');
+    if (el) el.focus();
   }
 
-  showScreen('search');
-  if (!append || state.lastSearchQuery !== query) {
-    state.searchPageToken = '';
-  }
-  state.lastSearchQuery = query;
-  rememberQuery(query);
-  setStatus(searchStatus, append ? 'Загружаю еще...' : 'Ищу видео...');
-
-  if (!apiReady()) {
-    const localMatches = starterVideos.filter(video => {
-      const haystack = `${video.title} ${video.channel}`.toLowerCase();
-      return haystack.includes(query.toLowerCase());
-    });
-    setStatus(searchStatus, 'API key не найден. Откройте сайт через ссылку с ?key=...');
-    renderVideoList(searchResults, localMatches, 'Нажмите YouTube для поиска на youtube.com');
-    moreResultsButton.hidden = true;
-    return;
-  }
-
-  try {
-    const isShorts = state.searchMode === 'shorts';
-    const data = await youtubeFetch('search', {
-      part: 'snippet',
-      type: 'video',
-      maxResults: 8,
-      videoDuration: isShorts ? 'short' : 'any',
-      order: state.searchOrder,
-      pageToken: append ? state.searchPageToken : '',
-      q: isShorts ? `${query} shorts` : query
-    });
-    const videos = normalizeSearchItems(data.items || [], state.searchMode);
-    state.searchPageToken = data.nextPageToken || '';
-    moreResultsButton.hidden = !state.searchPageToken;
-    setStatus(searchStatus, `${isShorts ? 'Shorts' : 'Видео'}: ${query}`);
-    if (append) {
-      const existing = Array.from(searchResults.querySelectorAll('.video-card')).map(card => {
-        try {
-          return JSON.parse(card.dataset.video);
-        } catch (error) {
-          return null;
-        }
-      }).filter(Boolean);
-      renderVideoList(searchResults, [...existing, ...videos], 'Ничего не найдено');
+  function moveFocus(direction) {
+    var container = screens[state.currentScreen];
+    if (!container) return;
+    var focusables = Array.from(
+      container.querySelectorAll('.focusable:not([disabled]):not(.hidden)')
+    );
+    if (focusables.length === 0) return;
+    var idx = focusables.indexOf(document.activeElement);
+    if (idx === -1) { focusFirst(container); return; }
+    var nextIdx;
+    if (direction === 'up' || direction === 'left') {
+      nextIdx = idx > 0 ? idx - 1 : focusables.length - 1;
     } else {
-      renderVideoList(searchResults, videos, 'Ничего не найдено');
+      nextIdx = idx < focusables.length - 1 ? idx + 1 : 0;
     }
-  } catch (error) {
-    setStatus(searchStatus, formatApiError(error));
-    renderVideoList(searchResults, [], 'Нет результатов');
-    moreResultsButton.hidden = true;
-  }
-}
-
-function runQuickSearch(button) {
-  const query = button.dataset.query || '';
-  if (button.dataset.kind) {
-    selectSearchMode(button.dataset.kind);
-  }
-  syncSearchInputs(query);
-  runSearch();
-}
-
-function playVideo(video) {
-  const normalized = normalizeVideo(video);
-  state.currentVideo = normalized;
-  state.previousScreen = state.activeScreen === 'player' ? state.previousScreen : state.activeScreen;
-  upsertHistory(normalized);
-
-  if (state.settings.playerMode === 'youtube') {
-    window.top.location.href = videoOpenUrl(normalized);
-    return;
+    focusables[nextIdx].focus();
+    focusables[nextIdx].scrollIntoView({ block: 'nearest', behavior: 'smooth' });
   }
 
-  frameShell.classList.toggle('shorts', normalized.kind === 'shorts');
-  frame.src = `https://www.youtube.com/embed/${normalized.id}?autoplay=1&playsinline=1&controls=1&rel=0`;
-  updateFavoriteButton();
-  showScreen('player');
-  window.setTimeout(() => {
-    if (state.activeScreen === 'player') {
-      toastMessage('Если видео не стартует, нажмите YouTube');
-    }
-  }, 1800);
-  if (state.settings.fullscreen) {
-    requestFullscreen();
-  }
-}
-
-function closePlayer() {
-  frame.src = 'about:blank';
-  showScreen(state.previousScreen || 'home');
-}
-
-function updateFavoriteButton() {
-  if (!state.currentVideo) return;
-  const saved = isFavorite(state.currentVideo.id);
-  favoriteButton.classList.toggle('saved', saved);
-  favoriteButton.textContent = saved ? 'Сохранено' : 'Сохранить';
-}
-
-async function requestFullscreen() {
-  const target = document.documentElement;
-  try {
-    if (!document.fullscreenElement && target.requestFullscreen) {
-      await target.requestFullscreen();
-    }
-  } catch (error) {
-    toastMessage('Fullscreen ожидает жест пользователя');
-  }
-}
-
-function openCurrentVideo() {
-  const target = state.currentVideo ? videoOpenUrl(state.currentVideo) : 'https://www.youtube.com';
-  window.top.location.href = target;
-}
-
-function openYouTubeSearch() {
-  const query = getSearchQuery();
-  window.top.location.href = query ? searchUrl(query) : 'https://www.youtube.com';
-}
-
-function renderLibrary() {
-  const items = state.libraryMode === 'favorites' ? state.favorites : state.history;
-  setStatus(
-    libraryStatus,
-    state.libraryMode === 'favorites' ? `${state.favorites.length} в избранном` : `${state.history.length} в истории`
-  );
-  renderVideoList(
-    libraryList,
-    items,
-    state.libraryMode === 'favorites' ? 'Избранное пока пустое' : 'История пока пустая'
-  );
-}
-
-function clearHistory() {
-  if (state.libraryMode === 'favorites') {
-    state.favorites = [];
-  } else {
-    state.history = [];
-  }
-  persistLibrary();
-  renderLibrary();
-  toastMessage('Готово');
-}
-
-function selectSearchMode(mode) {
-  state.searchMode = mode;
-  document.querySelectorAll('[data-search-mode]').forEach(button => {
-    button.classList.toggle('active', button.dataset.searchMode === mode);
-  });
-  if (getSearchQuery()) runSearch();
-}
-
-function selectSearchOrder(order) {
-  state.searchOrder = order;
-  document.querySelectorAll('[data-search-order]').forEach(button => {
-    button.classList.toggle('active', button.dataset.searchOrder === order);
-  });
-  if (getSearchQuery()) runSearch();
-}
-
-function selectLibraryMode(mode) {
-  state.libraryMode = mode;
-  document.querySelectorAll('[data-library-mode]').forEach(button => {
-    button.classList.toggle('active', button.dataset.libraryMode === mode);
-  });
-  renderLibrary();
-}
-
-function saveSettings() {
-  persistSettings();
-  setSettingsStatus('Настройки сохранены');
-  toastMessage('Настройки сохранены');
-  loadTrends();
-}
-
-function getSpeechRecognition() {
-  return window.SpeechRecognition || window.webkitSpeechRecognition;
-}
-
-function getVoiceSupportMessage() {
-  const hasSpeech = Boolean(getSpeechRecognition());
-  const hasMedia = Boolean(navigator.mediaDevices?.getUserMedia);
-  if (hasSpeech) {
-    return `Голос: Web Speech доступен (${getVoiceLanguage()}). Нажмите Голос и говорите.`;
-  }
-  if (hasMedia) {
-    return 'Голос: микрофон есть, но Web Speech нет. Нужен backend для распознавания.';
-  }
-  return 'Голос: WebView очков не дает Web Speech/микрофон. Используйте быстрые кнопки или ввод.';
-}
-
-function setSettingsStatus(message) {
-  const auth = state.googleToken ? ' Google подключен.' : '';
-  setStatus(settingsStatus, `${message}${auth}`);
-}
-
-async function checkVoiceSupport() {
-  const message = getVoiceSupportMessage();
-  setSettingsStatus(message);
-  toastMessage(message);
-}
-
-function getVoiceLanguage() {
-  if (state.settings.region === 'RU') return 'ru-RU';
-  if (state.settings.region === 'TR') return 'tr-TR';
-  if (state.settings.region === 'DE') return 'de-DE';
-  if (state.settings.region === 'FR') return 'fr-FR';
-  return 'en-US';
-}
-
-function getVoiceErrorMessage(error) {
-  const code = error?.error || 'unknown';
-  const messages = {
-    'no-speech': 'Голос: не услышал речь. Говорите сразу после нажатия.',
-    'audio-capture': 'Голос: микрофон недоступен для WebView.',
-    'not-allowed': 'Голос: нет разрешения на микрофон.',
-    'service-not-allowed': 'Голос: сервис распознавания запрещен в этом WebView.',
-    'network': 'Голос: ошибка сети распознавания.',
-    'aborted': 'Голос: распознавание остановлено.',
-    'language-not-supported': 'Голос: язык ru-RU не поддержан этим WebView.'
-  };
-  return messages[code] || `Голос: ошибка ${code}`;
-}
-
-function loadGoogleScript() {
-  return new Promise((resolve, reject) => {
-    if (window.google?.accounts?.oauth2) {
-      resolve();
+  // ==================== HOME SCREEN ====================
+  function renderRecent() {
+    var listEl = document.getElementById('recent-list');
+    var labelEl = document.getElementById('recent-label');
+    listEl.innerHTML = '';
+    if (!state.data.recent || state.data.recent.length === 0) {
+      labelEl.classList.add('hidden');
+      listEl.classList.add('hidden');
       return;
     }
-    const script = document.createElement('script');
-    script.src = 'https://accounts.google.com/gsi/client';
-    script.async = true;
-    script.defer = true;
-    script.onload = resolve;
-    script.onerror = reject;
-    document.head.appendChild(script);
-  });
-}
-
-async function signInGoogle() {
-  persistSettings();
-  if (!state.settings.clientId) {
-    setSettingsStatus('Добавьте Google OAuth Client ID или client_id в URL');
-    toastMessage('Нужен Client ID');
-    return;
+    labelEl.classList.remove('hidden');
+    listEl.classList.remove('hidden');
+    state.data.recent.forEach(function (q) {
+      var btn = document.createElement('button');
+      btn.className = 'list-item focusable';
+      btn.dataset.action = 'preset-search';
+      btn.dataset.query = q;
+      btn.innerHTML =
+        '<span class="list-item-icon">&#8635;</span>' +
+        '<span class="list-item-content"><span class="list-item-title"></span></span>';
+      btn.querySelector('.list-item-title').textContent = q;
+      listEl.appendChild(btn);
+    });
   }
 
-  try {
-    await loadGoogleScript();
-    const tokenClient = google.accounts.oauth2.initTokenClient({
-      client_id: state.settings.clientId,
-      scope: 'https://www.googleapis.com/auth/youtube.readonly',
-      callback: tokenResponse => {
-        if (tokenResponse?.access_token) {
-          state.googleToken = tokenResponse.access_token;
-          setSettingsStatus('Google подключен');
-          toastMessage('Google подключен');
-          loadTrends();
+  function pushRecent(query) {
+    var q = (query || '').trim();
+    if (!q) return;
+    state.data.recent = (state.data.recent || []).filter(function (r) { return r !== q; });
+    state.data.recent.unshift(q);
+    state.data.recent = state.data.recent.slice(0, CONFIG.recentMax);
+    saveData();
+  }
+
+  // ==================== SEARCH ====================
+  function runSearch(query) {
+    var apiKey = getEffectiveApiKey();
+    if (!apiKey) {
+      navigateTo('settings');
+      return;
+    }
+    var q = (query || '').trim();
+    if (!q) return;
+
+    pushRecent(q);
+    document.getElementById('results-title').textContent = q;
+    navigateTo('results');
+
+    var loadingEl = document.getElementById('results-loading');
+    var errorEl = document.getElementById('results-error');
+    var listEl = document.getElementById('results-list');
+    loadingEl.classList.remove('hidden');
+    errorEl.classList.add('hidden');
+    listEl.innerHTML = '';
+
+    var url = CONFIG.api.searchUrl +
+      '?part=snippet' +
+      '&type=video' +
+      '&maxResults=' + CONFIG.api.maxResults +
+      '&q=' + encodeURIComponent(q) +
+      '&key=' + encodeURIComponent(apiKey);
+
+    fetch(url)
+      .then(function (res) {
+        if (!res.ok) {
+          return res.json().then(function (body) {
+            var err = body && body.error;
+            var reason = err && err.errors && err.errors[0] && err.errors[0].reason;
+            var msg = (err && err.message) || ('HTTP ' + res.status);
+            var e = new Error(msg);
+            e.reason = reason || '';
+            e.status = res.status;
+            throw e;
+          }, function () {
+            var e = new Error('HTTP ' + res.status);
+            e.status = res.status;
+            throw e;
+          });
+        }
+        return res.json();
+      })
+      .then(function (data) {
+        loadingEl.classList.add('hidden');
+        var items = (data.items || []).filter(function (it) {
+          return it.id && it.id.videoId;
+        });
+        if (items.length === 0) {
+          showError('No results.');
+          return;
+        }
+        renderResults(items);
+      })
+      .catch(function (err) {
+        loadingEl.classList.add('hidden');
+        if (err.reason === 'quotaExceeded' || err.reason === 'dailyLimitExceeded') {
+          showQuotaExceeded();
+        } else if (err.reason === 'keyInvalid' || err.reason === 'API_KEY_INVALID') {
+          showError('API key is invalid. Open Settings to update it.');
+        } else if (err.reason === 'ipRefererBlocked' || err.reason === 'referrerBlocked') {
+          showError('API key is restricted to a different site. Update its allowed origins.');
         } else {
-          setSettingsStatus('Google не вернул access token');
+          showError(err.message || 'Search failed');
         }
-      }
-    });
-    tokenClient.requestAccessToken();
-  } catch (error) {
-    setSettingsStatus('Google вход недоступен в этом WebView');
-  }
-}
-
-function startVoiceSearch() {
-  const SpeechRecognition = getSpeechRecognition();
-  const activeInput = getVisibleSearchInput();
-  activeInput.focus({ preventScroll: true });
-  activeInput.select();
-  if (!SpeechRecognition) {
-    const message = getVoiceSupportMessage();
-    setStatus(searchStatus, message);
-    toastMessage('Голос недоступен в этом WebView');
-    return;
+      });
   }
 
-  const recognition = new SpeechRecognition();
-  recognition.lang = getVoiceLanguage();
-  recognition.interimResults = false;
-  recognition.maxAlternatives = 1;
-  setStatus(searchStatus, `Слушаю (${recognition.lang})...`);
-  toastMessage(`Слушаю ${recognition.lang}`);
-  recognition.onresult = event => {
-    const transcript = event.results?.[0]?.[0]?.transcript || '';
-    if (transcript.trim()) {
-      syncSearchInputs(transcript.trim());
-      runSearch();
+  function showQuotaExceeded() {
+    var errorEl = document.getElementById('results-error');
+    var msgEl = document.getElementById('results-error-message');
+    if (isUsingEmbeddedKey()) {
+      msgEl.innerHTML =
+        'Today’s shared search limit has been reached.<br>' +
+        'Add your own free key in Settings to keep searching — ' +
+        'each personal key gets ~100 searches per day.';
     } else {
-      setStatus(searchStatus, 'Голос: пустой результат');
-      toastMessage('Пустой результат');
+      msgEl.innerHTML =
+        'You’ve hit today’s YouTube quota for your personal key.<br>' +
+        'It resets at midnight Pacific time.';
     }
-  };
-  recognition.onnomatch = () => {
-    setStatus(searchStatus, 'Голос: не удалось сопоставить речь с текстом');
-    toastMessage('Не распознано');
-  };
-  recognition.onerror = event => {
-    const message = getVoiceErrorMessage(event);
-    setStatus(searchStatus, message);
-    toastMessage(message);
-  };
-  recognition.onend = () => {
-    if (!getSearchQuery()) setStatus(searchStatus, 'Голос остановлен');
-  };
-  recognition.start();
-}
+    errorEl.classList.remove('hidden');
+    // Replace the default "Back" button with two: Settings and Back.
+    var existing = errorEl.querySelector('.error-actions');
+    if (existing) existing.remove();
+    var actions = document.createElement('div');
+    actions.className = 'error-actions';
+    actions.innerHTML =
+      '<button class="nav-item primary focusable" data-action="open-settings">Get your own key</button>' +
+      '<button class="nav-item focusable" data-action="back">Back</button>';
+    errorEl.appendChild(actions);
+    // Hide the original single back button (it'll be in our actions row instead)
+    var origBack = errorEl.querySelector(':scope > [data-action="back"]');
+    if (origBack && origBack.tagName === 'BUTTON') origBack.classList.add('hidden');
+    focusFirst(screens.results);
+  }
 
-function bindEvents() {
-  searchButton.addEventListener('click', runSearch);
-  searchButtonSearch.addEventListener('click', runSearch);
-  searchInputs.forEach(input => {
-    input.addEventListener('input', () => syncSearchInputs(input.value));
-    input.addEventListener('keydown', event => {
-      if (event.key === 'Enter') {
-        event.preventDefault();
-        runSearch();
-      }
+  function showError(msg) {
+    var errorEl = document.getElementById('results-error');
+    document.getElementById('results-error-message').textContent = msg;
+    errorEl.classList.remove('hidden');
+    // Clear any quota-specific actions row from a prior error
+    var prior = errorEl.querySelector('.error-actions');
+    if (prior) prior.remove();
+    var origBack = errorEl.querySelector(':scope > [data-action="back"]');
+    if (origBack) origBack.classList.remove('hidden');
+    focusFirst(screens.results);
+  }
+
+  function renderResults(items) {
+    var listEl = document.getElementById('results-list');
+    listEl.innerHTML = '';
+    items.forEach(function (it) {
+      var snip = it.snippet || {};
+      var thumb = (snip.thumbnails && (snip.thumbnails.medium || snip.thumbnails.default)) || {};
+      var btn = document.createElement('button');
+      btn.className = 'list-item result-item focusable';
+      btn.dataset.action = 'play-video';
+      btn.dataset.videoId = it.id.videoId;
+      btn.dataset.title = snip.title || '';
+      btn.dataset.thumb = thumb.url || '';
+      btn.innerHTML =
+        '<img class="result-thumb" loading="lazy" alt="">' +
+        '<div class="list-item-content">' +
+          '<div class="result-title"></div>' +
+          '<div class="result-channel"></div>' +
+        '</div>';
+      btn.querySelector('.result-thumb').src = thumb.url || '';
+      btn.querySelector('.result-title').textContent = snip.title || '(untitled)';
+      btn.querySelector('.result-channel').textContent = snip.channelTitle || '';
+      listEl.appendChild(btn);
     });
-  });
-  voiceButton.addEventListener('click', startVoiceSearch);
-  voiceButtonSearch.addEventListener('click', startVoiceSearch);
-  refreshTrendsButton.addEventListener('click', loadTrends);
-  openYouTubeSearchButton.addEventListener('click', openYouTubeSearch);
-  moreResultsButton.addEventListener('click', () => runSearch({ append: true }));
-  clearHistoryButton.addEventListener('click', clearHistory);
-  saveSettingsButton.addEventListener('click', saveSettings);
-  googleButton.addEventListener('click', signInGoogle);
-  voiceCheckButton.addEventListener('click', checkVoiceSupport);
-  backButton.addEventListener('click', goBack);
-  settingsButton.addEventListener('click', () => {
-    state.previousScreen = state.activeScreen;
-    showScreen('settings');
-  });
-  playerBackButton.addEventListener('click', closePlayer);
-  favoriteButton.addEventListener('click', () => toggleFavorite(state.currentVideo));
-  fullscreenButton.addEventListener('click', requestFullscreen);
-  openVideoButton.addEventListener('click', openCurrentVideo);
+    // Land focus on the first result (not the header back button) and scroll to top.
+    var content = screens.results.querySelector('.content');
+    if (content) content.scrollTop = 0;
+    var firstResult = listEl.querySelector('.result-item');
+    if (firstResult) {
+      firstResult.focus();
+      firstResult.scrollIntoView({ block: 'start' });
+    } else {
+      focusFirst(screens.results);
+    }
+  }
 
-  document.querySelectorAll('[data-route]').forEach(button => {
-    button.addEventListener('click', () => showScreen(button.dataset.route));
-  });
-  document.querySelectorAll('[data-search-mode]').forEach(button => {
-    button.addEventListener('click', () => selectSearchMode(button.dataset.searchMode));
-  });
-  document.querySelectorAll('[data-search-order]').forEach(button => {
-    button.addEventListener('click', () => selectSearchOrder(button.dataset.searchOrder));
-  });
-  document.querySelectorAll('[data-library-mode]').forEach(button => {
-    button.addEventListener('click', () => selectLibraryMode(button.dataset.libraryMode));
-  });
-  document.querySelectorAll('[data-query]').forEach(button => {
-    button.addEventListener('click', () => runQuickSearch(button));
-  });
+  // ==================== WATCH HISTORY ====================
+  var HISTORY_MAX = 10;
 
-  document.addEventListener('keydown', event => {
-    if (isTextEntry(event.target)) {
-      if (event.key === 'Enter') {
-        event.preventDefault();
-        runSearch();
-      }
+  function pushHistory(videoId, title, thumb) {
+    var h = state.data.history || [];
+    // Remove dupe if already exists
+    h = h.filter(function (e) { return e.id !== videoId; });
+    h.unshift({ id: videoId, title: title || '', thumb: thumb || '', time: Date.now() });
+    state.data.history = h.slice(0, HISTORY_MAX);
+    saveData();
+  }
+
+  function renderHistory() {
+    var listEl = document.getElementById('history-list');
+    var labelEl = document.getElementById('history-label');
+    if (!listEl || !labelEl) return;
+    listEl.innerHTML = '';
+    var h = state.data.history || [];
+    if (h.length === 0) {
+      labelEl.classList.add('hidden');
+      listEl.classList.add('hidden');
+      return;
+    }
+    labelEl.classList.remove('hidden');
+    listEl.classList.remove('hidden');
+    h.forEach(function (v) {
+      var btn = document.createElement('button');
+      btn.className = 'list-item result-item focusable';
+      btn.dataset.action = 'play-video';
+      btn.dataset.videoId = v.id;
+      btn.dataset.title = v.title;
+      btn.dataset.thumb = v.thumb || '';
+      btn.innerHTML =
+        '<img class="result-thumb" loading="lazy" alt="">' +
+        '<div class="list-item-content">' +
+          '<div class="result-title"></div>' +
+        '</div>';
+      if (v.thumb) btn.querySelector('.result-thumb').src = v.thumb;
+      btn.querySelector('.result-title').textContent = v.title || v.id;
+      listEl.appendChild(btn);
+    });
+  }
+
+  // ==================== PLAYER ====================
+  function playVideo(videoId, title, thumb) {
+    pushHistory(videoId, title, thumb);
+    state.currentVideo = { id: videoId, title: title };
+    document.getElementById('player-title').textContent = title || '';
+    navigateTo('player');
+  }
+
+  function mountPlayer() {
+    if (!state.currentVideo) return;
+    // Reset progress bar for new video
+    document.getElementById('player-elapsed').textContent = '0:00';
+    document.getElementById('player-duration').textContent = '0:00';
+    document.getElementById('player-progress').style.width = '0%';
+
+    var mount = document.getElementById('player-mount');
+    mount.innerHTML = '<div id="yt-player"></div>';
+
+    var build = function () {
+      state.player = new window.YT.Player('yt-player', {
+        width: '600',
+        height: '600',
+        videoId: state.currentVideo.id,
+        playerVars: {
+          autoplay: 1,
+          controls: 0,
+          modestbranding: 1,
+          rel: 0,
+          fs: 0,
+          disablekb: 1,
+          playsinline: 1,
+        },
+        events: {
+          onReady: function (e) {
+            state.playerReady = true;
+            try { e.target.playVideo(); } catch (_) {}
+            startProgressTimer();
+            // Overlay stays visible briefly so user sees the title, then state
+            // events take over (hide on play, show on pause).
+            scheduleHideOverlay();
+          },
+          onStateChange: function (e) {
+            // 1=playing, 2=paused, 0=ended, 3=buffering, 5=cued
+            if (e.data === 1) {
+              hideOverlay();
+            } else if (e.data === 2 || e.data === 0) {
+              showOverlay(true);
+            }
+          },
+        },
+      });
+    };
+
+    if (window.YT && window.YT.Player) {
+      build();
+    } else {
+      var prev = window.onYouTubeIframeAPIReady;
+      window.onYouTubeIframeAPIReady = function () {
+        if (typeof prev === 'function') try { prev(); } catch (_) {}
+        build();
+      };
+    }
+  }
+
+  function teardownPlayer() {
+    stopProgressTimer();
+    state.playerReady = false;
+    if (state.player && typeof state.player.destroy === 'function') {
+      try { state.player.destroy(); } catch (_) {}
+    }
+    state.player = null;
+    state.currentVideo = null;
+    var mount = document.getElementById('player-mount');
+    if (mount) mount.innerHTML = '';
+    clearTimeout(state.overlayTimer);
+    showOverlay();
+  }
+
+  function togglePlay() {
+    if (!state.player || !state.playerReady) return;
+    var s = state.player.getPlayerState && state.player.getPlayerState();
+    // 1 = playing, 2 = paused, 3 = buffering, 5 = cued
+    if (s === 1) state.player.pauseVideo();
+    else state.player.playVideo();
+    // Overlay show/hide is driven by onStateChange — don't double-toggle here.
+  }
+
+  function seekBy(delta) {
+    if (!state.player || !state.playerReady) return;
+    try {
+      var t = state.player.getCurrentTime() + delta;
+      state.player.seekTo(Math.max(0, t), true);
+    } catch (_) {}
+    showOverlay();
+  }
+
+  function adjustVolume(delta) {
+    if (!state.player || !state.playerReady) return;
+    try {
+      var v = state.player.getVolume();
+      state.player.setVolume(Math.max(0, Math.min(100, v + delta)));
+    } catch (_) {}
+    showOverlay();
+  }
+
+  // ==================== PROGRESS BAR ====================
+  var progressInterval = null;
+
+  function formatTime(seconds) {
+    var s = Math.floor(seconds || 0);
+    var m = Math.floor(s / 60);
+    s = s % 60;
+    var h = Math.floor(m / 60);
+    m = m % 60;
+    var pad = function (n) { return n < 10 ? '0' + n : '' + n; };
+    return h > 0 ? h + ':' + pad(m) + ':' + pad(s) : m + ':' + pad(s);
+  }
+
+  function updateProgress() {
+    if (!state.player || !state.playerReady) return;
+    try {
+      var cur = state.player.getCurrentTime() || 0;
+      var dur = state.player.getDuration() || 0;
+      document.getElementById('player-elapsed').textContent = formatTime(cur);
+      document.getElementById('player-duration').textContent = formatTime(dur);
+      var pct = dur > 0 ? (cur / dur) * 100 : 0;
+      document.getElementById('player-progress').style.width = pct + '%';
+    } catch (_) {}
+  }
+
+  function startProgressTimer() {
+    stopProgressTimer();
+    updateProgress();
+    progressInterval = setInterval(updateProgress, 500);
+  }
+
+  function stopProgressTimer() {
+    clearInterval(progressInterval);
+    progressInterval = null;
+  }
+
+  // showOverlay(persistent) — if persistent is true (e.g. paused/ended), the
+  // overlay stays up. Otherwise it auto-hides after 3s (e.g. seek confirmation).
+  function showOverlay(persistent) {
+    var ov = document.getElementById('player-overlay');
+    var chip = document.getElementById('player-back-chip');
+    if (ov) ov.classList.remove('hidden-overlay');
+    if (chip) chip.classList.remove('hidden-overlay');
+    updateProgress();
+    clearTimeout(state.overlayTimer);
+    if (!persistent) scheduleHideOverlay();
+  }
+
+  function hideOverlay() {
+    clearTimeout(state.overlayTimer);
+    var ov = document.getElementById('player-overlay');
+    var chip = document.getElementById('player-back-chip');
+    // Never hide while the chip is focused — user is mid-navigation to back.
+    if (chip && document.activeElement === chip) return;
+    if (ov) ov.classList.add('hidden-overlay');
+    if (chip) chip.classList.add('hidden-overlay');
+  }
+
+  function scheduleHideOverlay() {
+    clearTimeout(state.overlayTimer);
+    state.overlayTimer = setTimeout(hideOverlay, 3000);
+  }
+
+  // ==================== VOICE SEARCH ====================
+  var SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  var voiceRecognition = null;
+
+  function isVoiceSupported() {
+    if (!SpeechRecognition) return false;
+    try {
+      if (localStorage.getItem('mdg_yt_voice_unsupported') === '1') return false;
+    } catch (_) {}
+    return true;
+  }
+
+  function applyVoiceSupportUI() {
+    var micBtn = document.getElementById('mic-btn');
+    if (!micBtn) return;
+    micBtn.classList.toggle('hidden', !isVoiceSupported());
+  }
+
+  function startVoiceSearch() {
+    if (!isVoiceSupported()) {
+      showToast('Voice search not supported on this device');
+      applyVoiceSupportUI();
+      return;
+    }
+    var micBtn = document.getElementById('mic-btn');
+
+    // If already listening, stop
+    if (voiceRecognition) {
+      voiceRecognition.abort();
+      voiceRecognition = null;
+      if (micBtn) micBtn.classList.remove('listening');
       return;
     }
 
-    if (event.key === 'ArrowDown' || event.key === 'ArrowRight') {
-      event.preventDefault();
-      moveFocus(1);
-    } else if (event.key === 'ArrowUp' || event.key === 'ArrowLeft') {
-      event.preventDefault();
-      moveFocus(-1);
-    } else if (event.key === 'Enter' || event.key === ' ') {
-      const active = document.activeElement;
-      if (active && active.matches('button, .video-card')) {
-        event.preventDefault();
-        active.click();
+    voiceRecognition = new SpeechRecognition();
+    voiceRecognition.lang = 'en-US';
+    voiceRecognition.interimResults = false;
+    voiceRecognition.maxAlternatives = 1;
+
+    if (micBtn) micBtn.classList.add('listening');
+
+    voiceRecognition.onresult = function (event) {
+      var transcript = event.results[0][0].transcript;
+      document.getElementById('search-input').value = transcript;
+      if (micBtn) micBtn.classList.remove('listening');
+      voiceRecognition = null;
+      runSearch(transcript);
+    };
+
+    voiceRecognition.onerror = function (event) {
+      if (micBtn) micBtn.classList.remove('listening');
+      voiceRecognition = null;
+      if (event.error === 'no-speech') {
+        showToast('No speech detected — try again');
+      } else if (event.error === 'not-allowed') {
+        showToast('Microphone access denied');
+      } else if (event.error === 'service-not-allowed') {
+        // The WebView has no speech service backend (typical on the glasses).
+        // Hide the mic button for future visits and tell the user how to search.
+        try { localStorage.setItem('mdg_yt_voice_unsupported', '1'); } catch (_) {}
+        applyVoiceSupportUI();
+        showToast('Voice not supported on this device — use ?q= URL param');
+      } else if (event.error === 'audio-capture') {
+        showToast('No microphone available');
+      } else if (event.error === 'network') {
+        showToast('Voice search needs internet');
+      } else {
+        showToast('Voice error: ' + event.error);
       }
-    } else if (event.key === 'Escape' || event.key === 'Backspace') {
-      event.preventDefault();
-      goBack();
-    }
-  });
+    };
 
-  let startX = 0;
-  let startY = 0;
-  app.addEventListener('pointerdown', event => {
-    startX = event.clientX;
-    startY = event.clientY;
-  });
-  app.addEventListener('pointerup', event => {
-    if (isTextEntry(event.target)) return;
-    const dx = event.clientX - startX;
-    const dy = event.clientY - startY;
-    const horizontal = Math.abs(dx) > Math.abs(dy);
-    if (Math.max(Math.abs(dx), Math.abs(dy)) < 36) return;
-    if (horizontal) {
-      moveFocus(dx > 0 ? 1 : -1);
-    } else if (dy < 0) {
-      document.activeElement?.click();
+    voiceRecognition.onend = function () {
+      if (micBtn) micBtn.classList.remove('listening');
+      voiceRecognition = null;
+    };
+
+    voiceRecognition.start();
+  }
+
+  function showToast(message) {
+    var toast = document.getElementById('toast');
+    if (!toast) {
+      toast = document.createElement('div');
+      toast.id = 'toast';
+      toast.className = 'toast';
+      document.body.appendChild(toast);
+    }
+    toast.textContent = message;
+    toast.className = 'toast';
+    toast.offsetHeight;
+    toast.classList.add('visible');
+    setTimeout(function () { toast.classList.remove('visible'); }, 3000);
+  }
+
+  function renderKeyStatus() {
+    var el = document.getElementById('key-status');
+    if (!el) return;
+    el.className = 'key-status';
+    var icon = '', label = '', detail = '';
+    if (state.data.apiKey) {
+      el.classList.add('personal');
+      icon = '✓';
+      label = 'Using your personal key';
+      detail = 'Higher quota — ~100 searches/day just for you.';
+    } else if (getEmbeddedApiKey()) {
+      el.classList.add('shared');
+      icon = '✱';
+      label = 'Using the shared key';
+      detail = 'Works out of the box. Quota is shared with all users — add your own below if it runs out.';
     } else {
-      goBack();
+      el.classList.add('none');
+      icon = '⚠';
+      label = 'No API key configured';
+      detail = 'Paste a YouTube Data API v3 key below to enable search.';
     }
-  });
-}
-
-function init() {
-  loadState();
-  bindEvents();
-  renderFallbackTrends('');
-  renderLibrary();
-  loadTrends();
-  backButton.hidden = true;
-  backButton.disabled = true;
-  refreshFocusables();
-  if (window.__ytgKeyLoadedFromUrl) {
-    toastMessage('API key сохранен');
+    el.innerHTML =
+      '<div class="key-status-icon"></div>' +
+      '<div class="key-status-text"><strong></strong><span></span></div>';
+    el.querySelector('.key-status-icon').textContent = icon;
+    el.querySelector('strong').textContent = label;
+    el.querySelector('span').textContent = detail;
+    // Show/hide Clear button based on whether a personal key exists.
+    var clearBtn = document.getElementById('clear-apikey-btn');
+    if (clearBtn) clearBtn.classList.toggle('hidden', !state.data.apiKey);
   }
-  if (window.__ytgClientLoadedFromUrl) {
-    setSettingsStatus('Google Client ID сохранен из URL');
-  }
-}
 
-init();
+  // ==================== ON-SCREEN KEYBOARD ====================
+  // 10x4 grid. Each cell is one focusable key for predictable D-pad 2D nav.
+  // Row 3 last 3 cells are action keys: space, backspace, submit.
+  var KB_ROWS = [
+    ['1','2','3','4','5','6','7','8','9','0'],
+    ['q','w','e','r','t','y','u','i','o','p'],
+    ['a','s','d','f','g','h','j','k','l',"'"],
+    ['z','x','c','v','b','n','m','SPACE','BACK','GO'],
+  ];
+  var kbBuffer = '';
+  var kbRendered = false;
+
+  function renderKeyboardGrid() {
+    if (kbRendered) return;
+    var grid = document.getElementById('kb-grid');
+    if (!grid) return;
+    grid.innerHTML = '';
+    KB_ROWS.forEach(function (row, rIdx) {
+      row.forEach(function (ch, cIdx) {
+        var btn = document.createElement('button');
+        btn.className = 'kb-key focusable';
+        btn.dataset.row = rIdx;
+        btn.dataset.col = cIdx;
+        if (ch === 'SPACE') {
+          btn.classList.add('kb-action');
+          btn.textContent = '␣';
+          btn.dataset.action = 'kb-space';
+        } else if (ch === 'BACK') {
+          btn.classList.add('kb-action');
+          btn.textContent = '⌫';
+          btn.dataset.action = 'kb-backspace';
+        } else if (ch === 'GO') {
+          btn.classList.add('kb-action', 'kb-submit');
+          btn.textContent = '⏎';
+          btn.dataset.action = 'kb-submit';
+        } else {
+          btn.textContent = ch;
+          btn.dataset.action = 'kb-char';
+          btn.dataset.char = ch;
+        }
+        grid.appendChild(btn);
+      });
+    });
+    kbRendered = true;
+  }
+
+  function updateKbDisplay() {
+    var txt = document.getElementById('kb-text');
+    if (txt) txt.textContent = kbBuffer;
+  }
+
+  function openKeyboard() {
+    var input = document.getElementById('search-input');
+    kbBuffer = (input && input.value) || '';
+    navigateTo('keyboard');
+  }
+
+  function kbAppend(ch) {
+    if (kbBuffer.length >= 80) return;
+    kbBuffer += ch;
+    updateKbDisplay();
+  }
+
+  function kbBackspace() {
+    kbBuffer = kbBuffer.slice(0, -1);
+    updateKbDisplay();
+  }
+
+  function kbSubmit() {
+    var q = kbBuffer.trim();
+    if (!q) return;
+    var input = document.getElementById('search-input');
+    if (input) input.value = q;
+    // Pop the keyboard from history so back from results goes to home, not kb.
+    if (state.screenHistory[state.screenHistory.length - 1] === 'home') {
+      state.screenHistory.pop();
+      state.currentScreen = 'home';
+    }
+    runSearch(q);
+  }
+
+  function kbCancel() {
+    kbBuffer = '';
+    navigateBack();
+  }
+
+  function kbMoveFocus(direction) {
+    var current = document.activeElement;
+    var rows = KB_ROWS.length;
+    var cols = KB_ROWS[0].length;
+    var row, col;
+    if (current && current.classList.contains('kb-key')) {
+      row = parseInt(current.dataset.row, 10);
+      col = parseInt(current.dataset.col, 10);
+    } else {
+      row = 0; col = 0;
+    }
+    if (direction === 'up')         row = (row - 1 + rows) % rows;
+    else if (direction === 'down')  row = (row + 1) % rows;
+    else if (direction === 'left')  col = (col - 1 + cols) % cols;
+    else if (direction === 'right') col = (col + 1) % cols;
+    var next = document.querySelector(
+      '#kb-grid .kb-key[data-row="' + row + '"][data-col="' + col + '"]'
+    );
+    if (next) next.focus();
+  }
+
+  // ==================== ACTION HANDLING ====================
+  function handleAction(action, element) {
+    switch (action) {
+      case 'back': navigateBack(); break;
+      case 'open-settings': navigateTo('settings'); break;
+      case 'run-search': {
+        var input = document.getElementById('search-input');
+        if (!input.value.trim()) {
+          openKeyboard();
+        } else {
+          runSearch(input.value);
+        }
+        break;
+      }
+      case 'preset-search': {
+        var q = element.dataset.query || '';
+        document.getElementById('search-input').value = q;
+        runSearch(q);
+        break;
+      }
+      case 'play-video': {
+        playVideo(element.dataset.videoId, element.dataset.title, element.dataset.thumb || '');
+        break;
+      }
+      case 'save-apikey': {
+        var v = document.getElementById('apikey-input').value.trim();
+        if (!v) return;
+        state.data.apiKey = v;
+        saveData();
+        // If no history (first visit → settings), go home; otherwise go back
+        if (state.screenHistory.length > 0) {
+          navigateBack();
+        } else {
+          navigateTo('home', { addToHistory: false });
+        }
+        break;
+      }
+      case 'clear-apikey': {
+        state.data.apiKey = '';
+        saveData();
+        document.getElementById('apikey-input').value = '';
+        renderKeyStatus();
+        showToast('Personal key removed — using shared key');
+        break;
+      }
+      case 'voice-search': startVoiceSearch(); break;
+      case 'toggle-play': togglePlay(); break;
+      case 'open-keyboard': openKeyboard(); break;
+      case 'kb-char': kbAppend(element.dataset.char || ''); break;
+      case 'kb-space': kbAppend(' '); break;
+      case 'kb-backspace': kbBackspace(); break;
+      case 'kb-submit': kbSubmit(); break;
+      case 'kb-cancel': kbCancel(); break;
+    }
+  }
+
+  function onScreenEnter(screenId) {
+    if (screenId === 'home') {
+      renderRecent();
+      renderHistory();
+    } else if (screenId === 'settings') {
+      document.getElementById('apikey-input').value = state.data.apiKey || '';
+      renderKeyStatus();
+    } else if (screenId === 'player') {
+      mountPlayer();
+      // Route key events to our handler, not the iframe
+      setTimeout(function () {
+        var sink = document.getElementById('player-focus-sink');
+        if (sink) sink.focus();
+      }, 50);
+    } else if (screenId === 'keyboard') {
+      renderKeyboardGrid();
+      updateKbDisplay();
+      // Focus a sensible starting key (q) so typing feels natural
+      setTimeout(function () {
+        var start = document.querySelector('#kb-grid .kb-key[data-row="1"][data-col="0"]');
+        if (start) start.focus();
+      }, 30);
+    }
+  }
+
+  // ==================== EVENTS ====================
+  function setupEvents() {
+    document.addEventListener('click', function (e) {
+      var actionEl = e.target.closest('[data-action]');
+      if (actionEl) handleAction(actionEl.dataset.action, actionEl);
+    });
+
+    document.addEventListener('keydown', function (e) {
+      // Player screen: D-pad navigates between the "video" (focus-sink) and
+      // the back chip. Left/right = seek. Enter activates whatever is focused.
+      if (state.currentScreen === 'player') {
+        var sink = document.getElementById('player-focus-sink');
+        var chip = document.getElementById('player-back-chip');
+        var aeP = document.activeElement;
+        var onChip = aeP === chip;
+        switch (e.key) {
+          case 'ArrowLeft':  seekBy(-10); e.preventDefault(); return;
+          case 'ArrowRight': seekBy(10);  e.preventDefault(); return;
+          case 'ArrowUp':
+            if (chip && !onChip) { chip.focus(); showOverlay(true); }
+            e.preventDefault();
+            return;
+          case 'ArrowDown':
+            if (sink && onChip) {
+              sink.focus();
+              // If the video is playing, drop the overlay since user is back
+              // in "watch" mode. If paused/ended, leave it (state event has it).
+              var ps = state.player && state.player.getPlayerState
+                && state.player.getPlayerState();
+              if (ps === 1) hideOverlay();
+            }
+            e.preventDefault();
+            return;
+          case ' ':
+            togglePlay();
+            e.preventDefault();
+            return;
+          case 'Enter':
+            if (onChip) {
+              navigateBack();
+            } else {
+              togglePlay();
+            }
+            e.preventDefault();
+            return;
+          case 'Escape':
+            navigateBack();
+            e.preventDefault();
+            return;
+        }
+        return;
+      }
+
+      // On the keyboard screen, arrows do 2D grid nav.
+      if (state.currentScreen === 'keyboard') {
+        switch (e.key) {
+          case 'ArrowUp':    kbMoveFocus('up');    e.preventDefault(); return;
+          case 'ArrowDown':  kbMoveFocus('down');  e.preventDefault(); return;
+          case 'ArrowLeft':  kbMoveFocus('left');  e.preventDefault(); return;
+          case 'ArrowRight': kbMoveFocus('right'); e.preventDefault(); return;
+          case 'Backspace':  kbBackspace(); e.preventDefault(); return;
+          case 'Enter': {
+            // If focus is on a key button, click it (handled by default below).
+            var ae2 = document.activeElement;
+            if (ae2 && ae2.classList.contains('kb-key')) {
+              ae2.click();
+              e.preventDefault();
+              return;
+            }
+            // Fallback: submit the current buffer
+            kbSubmit();
+            e.preventDefault();
+            return;
+          }
+          case 'Escape': kbCancel(); e.preventDefault(); return;
+        }
+        // Allow physical keyboard typing to work on desktop while keyboard screen is open
+        if (e.key.length === 1 && /^[\w\d\s'.,!?-]$/.test(e.key)) {
+          kbAppend(e.key.toLowerCase());
+          e.preventDefault();
+          return;
+        }
+        return;
+      }
+
+      // Other screens: text inputs swallow most keys.
+      var ae = document.activeElement;
+      var isInput = ae && (ae.tagName === 'INPUT' || ae.tagName === 'TEXTAREA');
+      if (isInput && !['Escape', 'Enter', 'ArrowUp', 'ArrowDown'].includes(e.key)) return;
+
+      switch (e.key) {
+        case 'ArrowUp':    moveFocus('up');    e.preventDefault(); break;
+        case 'ArrowDown':  moveFocus('down');  e.preventDefault(); break;
+        case 'ArrowLeft':
+          if (!isInput) { moveFocus('left'); e.preventDefault(); }
+          break;
+        case 'ArrowRight':
+          if (!isInput) { moveFocus('right'); e.preventDefault(); }
+          break;
+        case 'Enter':
+          if (isInput && ae.dataset.submitAction) {
+            handleAction(ae.dataset.submitAction, ae);
+          } else if (ae && ae.classList.contains('focusable')) {
+            ae.click();
+          }
+          e.preventDefault();
+          break;
+        case 'Escape':
+          navigateBack();
+          e.preventDefault();
+          break;
+      }
+    });
+  }
+
+  // ==================== URL PARAM BOOTSTRAP ====================
+  // Supported params (stripped from URL after first read):
+  //   ?key=AIza...    YouTube Data API key, saved to localStorage
+  //   ?q=lofi+beats   one-shot search run on load (NOT saved)
+  // Example URL to register on the glasses (no typing required):
+  //   https://imfkbatman.github.io/youtube-glasses/?key=AIza...&q=nature+4k
+  var pendingQuery = null;
+  function bootstrapFromUrl() {
+    try {
+      var params = new URLSearchParams(window.location.search);
+      var changed = false;
+      var urlKey = params.get('key');
+      if (urlKey && urlKey.length > 10) {
+        state.data.apiKey = urlKey;
+        params.delete('key');
+        changed = true;
+      }
+      var urlQuery = params.get('q');
+      if (urlQuery && urlQuery.trim()) {
+        pendingQuery = urlQuery.trim();
+        params.delete('q');
+        changed = true;
+      }
+      if (changed) {
+        saveData();
+        if (window.history && window.history.replaceState) {
+          var clean = window.location.pathname + (params.toString() ? '?' + params.toString() : '');
+          window.history.replaceState(null, '', clean);
+        }
+      }
+    } catch (_) {}
+  }
+
+  // ==================== INIT ====================
+  function init() {
+    collectScreens();
+    setupEvents();
+    loadData();
+    bootstrapFromUrl();
+    setTimeout(function () {
+      if (!getEffectiveApiKey()) {
+        // No personal key and no embedded shared key -> force setup.
+        navigateTo('settings', { addToHistory: false });
+      } else if (pendingQuery) {
+        navigateTo('home', { addToHistory: false });
+        runSearch(pendingQuery);
+        pendingQuery = null;
+      } else {
+        navigateTo('home', { addToHistory: false });
+      }
+      applyVoiceSupportUI();
+    }, 50);
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+  } else {
+    init();
+  }
+})();

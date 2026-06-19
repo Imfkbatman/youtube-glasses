@@ -1,36 +1,32 @@
-Ray-Ban Meta Display YouTube Web App
+YouTube Viewer for Ray-Ban Meta Display
 
-Запуск:
-1. Залей папку на HTTPS-хостинг: GitHub Pages, Netlify или Vercel.
-2. В Meta AI app открой Web Apps -> Connect a Web App.
-3. App name: YouTube Glass
-4. URL: ссылка на index.html или корень сайта.
-5. Открой приложение на очках.
+Это версия на основе проекта LiquidAzir/youtube-viewer. Старое приложение заменено полностью: теперь в корне лежит проект с экранной клавиатурой, D-pad навигацией, поиском YouTube, историей просмотров и iframe-плеером.
 
-Что добавлено:
-- поиск по ссылке, video ID и YouTube Data API;
-- главная страница с live-трендами YouTube при наличии API key;
-- режим Shorts с вертикальным плеером;
-- режим открытия видео через обычный YouTube для WebView очков;
-- запрос fullscreen после пользовательского жеста;
-- избранное и история просмотров в localStorage;
-- управление D-Pad, клавиатурой и свайпами;
-- подготовка Google OAuth через Google OAuth Client ID;
-- голосовой поиск через Web Speech API, если WebView его поддерживает.
+Сайт:
+https://imfkbatman.github.io/youtube-glasses/
 
-Настройка YouTube Data API:
-Не добавляй API key прямо в app.js: это публичный файл, GitHub пометит его как leaked secret.
+Ссылка для очков с API key:
+https://imfkbatman.github.io/youtube-glasses/?key=ТВОЙ_API_KEY
 
-Варианты настройки:
-1. Открой сайт с хэшем #key=ТВОЙ_КЛЮЧ. Приложение сохранит ключ в localStorage и уберет его из адресной строки.
-2. Или открой настройки приложения и вставь ключ в поле YouTube API key.
+Что внутри:
+- index.html - разметка приложения;
+- app.js - логика поиска, клавиатуры, истории, голоса и плеера;
+- styles.css - интерфейс 600x600 для Ray-Ban Display;
+- config.js - опциональный общий API key, сейчас оставлен пустым;
+- manifest.webmanifest и favicon.png - данные web app;
+- scripts/make-pair-qr.py - генератор QR-ссылки с ключом.
 
-Настройка Google входа:
-1. Создай OAuth Client ID для Web application в Google Cloud Console.
-2. Добавь HTTPS-домен приложения в Authorized JavaScript origins.
-3. Вставь Client ID в настройках приложения.
+Важно про ключ:
+Не вставляй настоящий API key в app.js или config.js перед заливкой на GitHub. Это публичные файлы, GitHub снова откроет Secret Scanning alert.
 
-Ограничения:
-- Google OAuth и живой YouTube API требуют проекта Google Cloud.
-- Голосовой ввод зависит от WebView на очках. Если Web Speech API недоступен, можно сфокусировать поле поиска и использовать системную диктовку Meta AI.
-- Приложение не устанавливает YouTube APK и не обходит ограничения YouTube.
+Лучший вариант для очков:
+Открыть сайт один раз по ссылке с ?key=... . Приложение сохранит ключ в localStorage и дальше будет искать без ручного ввода.
+
+Если хочешь встроить общий ключ для всех:
+Можно прописать его в config.js, но только после ограничения ключа в Google Cloud:
+- API restrictions: только YouTube Data API v3;
+- Application restrictions: Websites;
+- Website restriction: https://imfkbatman.github.io/youtube-glasses/*
+
+Голос:
+Голосовой поиск работает только если WebView очков поддерживает Web Speech API. Если очки его не дают, используем экранную клавиатуру или URL-параметр ?q=запрос.
