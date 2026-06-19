@@ -2,9 +2,11 @@ const STORAGE_KEYS = {
   apiKey: 'ytg.apiKey',
   clientId: 'ytg.clientId',
   region: 'ytg.region',
+  playerMode: 'ytg.playerMode',
   fullscreen: 'ytg.fullscreen',
   history: 'ytg.history',
-  favorites: 'ytg.favorites'
+  favorites: 'ytg.favorites',
+  queries: 'ytg.queries'
 };
 
 const starterVideos = [
@@ -53,12 +55,15 @@ const backButton = document.getElementById('backButton');
 const settingsButton = document.getElementById('settingsButton');
 const refreshTrendsButton = document.getElementById('refreshTrendsButton');
 const openYouTubeSearchButton = document.getElementById('openYouTubeSearchButton');
+const moreResultsButton = document.getElementById('moreResultsButton');
 const clearHistoryButton = document.getElementById('clearHistoryButton');
 const saveSettingsButton = document.getElementById('saveSettingsButton');
 const googleButton = document.getElementById('googleButton');
+const voiceCheckButton = document.getElementById('voiceCheckButton');
 const apiKeyInput = document.getElementById('apiKeyInput');
 const clientIdInput = document.getElementById('clientIdInput');
 const regionSelect = document.getElementById('regionSelect');
+const playerModeSelect = document.getElementById('playerModeSelect');
 const fullscreenToggle = document.getElementById('fullscreenToggle');
 const trendGrid = document.getElementById('trendGrid');
 const trendStatus = document.getElementById('trendStatus');
@@ -82,17 +87,22 @@ const state = {
   focusables: [],
   focusIndex: 0,
   searchMode: 'video',
+  searchOrder: 'relevance',
+  searchPageToken: '',
+  lastSearchQuery: '',
   libraryMode: 'history',
   googleToken: '',
   currentVideo: null,
   settings: {
     apiKey: '',
     clientId: '',
-    region: 'US',
+    region: 'RU',
+    playerMode: 'youtube',
     fullscreen: true
   },
   history: [],
-  favorites: []
+  favorites: [],
+  queries: []
 };
 
 function safeParse(value, fallback) {
@@ -103,10 +113,18 @@ function safeParse(value, fallback) {
   }
 }
 
-function consumeApiKeyFromUrl() {
+function getUrlValue(...names) {
   const hash = new URLSearchParams(window.location.hash.replace(/^#/, ''));
   const query = new URLSearchParams(window.location.search);
-  const key = (hash.get('key') || hash.get('apiKey') || query.get('key') || query.get('apiKey') || '').trim();
+  for (const name of names) {
+    const value = (query.get(name) || hash.get(name) || '').trim();
+    if (value) return value;
+  }
+  return '';
+}
+
+function consumeApiKeyFromUrl() {
+  const key = getUrlValue('key', 'apiKey');
   if (!key) return '';
 
   try {
@@ -118,17 +136,43 @@ function consumeApiKeyFromUrl() {
   return key;
 }
 
+function consumeClientIdFromUrl() {
+  const clientId = getUrlValue('client_id', 'clientId');
+  if (!clientId) return '';
+
+  try {
+    localStorage.setItem(STORAGE_KEYS.clientId, clientId);
+  } catch (error) {
+    // Keep it in memory if the glasses WebView does not persist localStorage.
+  }
+  window.__ytgClientLoadedFromUrl = true;
+  return clientId;
+}
+
+function getUrlPlayerMode() {
+  const mode = getUrlValue('player', 'playerMode');
+  return mode === 'embed' || mode === 'youtube' ? mode : '';
+}
+
+function getUrlRegion() {
+  const region = getUrlValue('region').toUpperCase();
+  return /^[A-Z]{2}$/.test(region) ? region : '';
+}
+
 function loadState() {
   state.settings.apiKey = consumeApiKeyFromUrl() || localStorage.getItem(STORAGE_KEYS.apiKey) || '';
-  state.settings.clientId = localStorage.getItem(STORAGE_KEYS.clientId) || '';
-  state.settings.region = localStorage.getItem(STORAGE_KEYS.region) || 'US';
+  state.settings.clientId = consumeClientIdFromUrl() || localStorage.getItem(STORAGE_KEYS.clientId) || '';
+  state.settings.region = getUrlRegion() || localStorage.getItem(STORAGE_KEYS.region) || 'RU';
+  state.settings.playerMode = getUrlPlayerMode() || localStorage.getItem(STORAGE_KEYS.playerMode) || 'youtube';
   state.settings.fullscreen = localStorage.getItem(STORAGE_KEYS.fullscreen) !== 'false';
   state.history = safeParse(localStorage.getItem(STORAGE_KEYS.history), []);
   state.favorites = safeParse(localStorage.getItem(STORAGE_KEYS.favorites), []);
+  state.queries = safeParse(localStorage.getItem(STORAGE_KEYS.queries), []);
 
   apiKeyInput.value = state.settings.apiKey;
   clientIdInput.value = state.settings.clientId;
   regionSelect.value = state.settings.region;
+  playerModeSelect.value = state.settings.playerMode;
   fullscreenToggle.checked = state.settings.fullscreen;
 }
 
@@ -136,17 +180,20 @@ function persistSettings() {
   state.settings.apiKey = apiKeyInput.value.trim();
   state.settings.clientId = clientIdInput.value.trim();
   state.settings.region = regionSelect.value;
+  state.settings.playerMode = playerModeSelect.value;
   state.settings.fullscreen = fullscreenToggle.checked;
 
   localStorage.setItem(STORAGE_KEYS.apiKey, state.settings.apiKey);
   localStorage.setItem(STORAGE_KEYS.clientId, state.settings.clientId);
   localStorage.setItem(STORAGE_KEYS.region, state.settings.region);
+  localStorage.setItem(STORAGE_KEYS.playerMode, state.settings.playerMode);
   localStorage.setItem(STORAGE_KEYS.fullscreen, String(state.settings.fullscreen));
 }
 
 function persistLibrary() {
   localStorage.setItem(STORAGE_KEYS.history, JSON.stringify(state.history.slice(0, 40)));
   localStorage.setItem(STORAGE_KEYS.favorites, JSON.stringify(state.favorites.slice(0, 40)));
+  localStorage.setItem(STORAGE_KEYS.queries, JSON.stringify(state.queries.slice(0, 12)));
 }
 
 function toastMessage(message) {
@@ -470,6 +517,12 @@ function normalizeSearchItems(items, kind = state.searchMode) {
     .filter(Boolean);
 }
 
+function rememberQuery(query) {
+  if (!query) return;
+  state.queries = [query, ...state.queries.filter(item => item.toLowerCase() !== query.toLowerCase())].slice(0, 12);
+  persistLibrary();
+}
+
 async function loadTrends() {
   if (!apiReady()) {
     renderFallbackTrends('Показываю подборку. Live-тренды включатся автоматически, когда API будет доступен.');
@@ -492,13 +545,14 @@ async function loadTrends() {
   }
 }
 
-async function runSearch() {
+async function runSearch({ append = false } = {}) {
   const query = getSearchQuery();
   syncSearchInputs(query);
   if (!query) {
     showScreen('search');
     setStatus(searchStatus, 'Введите запрос или ссылку на видео');
     renderVideoList(searchResults, starterVideos, 'Введите запрос');
+    moreResultsButton.hidden = true;
     return;
   }
 
@@ -514,7 +568,12 @@ async function runSearch() {
   }
 
   showScreen('search');
-  setStatus(searchStatus, 'Ищу видео...');
+  if (!append || state.lastSearchQuery !== query) {
+    state.searchPageToken = '';
+  }
+  state.lastSearchQuery = query;
+  rememberQuery(query);
+  setStatus(searchStatus, append ? 'Загружаю еще...' : 'Ищу видео...');
 
   if (!apiReady()) {
     const localMatches = starterVideos.filter(video => {
@@ -523,22 +582,41 @@ async function runSearch() {
     });
     setStatus(searchStatus, 'API key не найден. Откройте сайт через ссылку с ?key=...');
     renderVideoList(searchResults, localMatches, 'Нажмите YouTube для поиска на m.youtube.com');
+    moreResultsButton.hidden = true;
     return;
   }
 
   try {
+    const isShorts = state.searchMode === 'shorts';
     const data = await youtubeFetch('search', {
       part: 'snippet',
       type: 'video',
       maxResults: 8,
-      q: state.searchMode === 'shorts' ? `${query} #shorts` : query
+      videoDuration: isShorts ? 'short' : 'any',
+      order: state.searchOrder,
+      pageToken: append ? state.searchPageToken : '',
+      q: isShorts ? `${query} shorts` : query
     });
     const videos = normalizeSearchItems(data.items || [], state.searchMode);
-    setStatus(searchStatus, state.searchMode === 'shorts' ? 'Результаты Shorts' : 'Результаты YouTube');
-    renderVideoList(searchResults, videos, 'Ничего не найдено');
+    state.searchPageToken = data.nextPageToken || '';
+    moreResultsButton.hidden = !state.searchPageToken;
+    setStatus(searchStatus, `${isShorts ? 'Shorts' : 'Видео'}: ${query}`);
+    if (append) {
+      const existing = Array.from(searchResults.querySelectorAll('.video-card')).map(card => {
+        try {
+          return JSON.parse(card.dataset.video);
+        } catch (error) {
+          return null;
+        }
+      }).filter(Boolean);
+      renderVideoList(searchResults, [...existing, ...videos], 'Ничего не найдено');
+    } else {
+      renderVideoList(searchResults, videos, 'Ничего не найдено');
+    }
   } catch (error) {
     setStatus(searchStatus, formatApiError(error));
     renderVideoList(searchResults, [], 'Нет результатов');
+    moreResultsButton.hidden = true;
   }
 }
 
@@ -555,9 +633,15 @@ function playVideo(video) {
   const normalized = normalizeVideo(video);
   state.currentVideo = normalized;
   state.previousScreen = state.activeScreen === 'player' ? state.previousScreen : state.activeScreen;
+  upsertHistory(normalized);
+
+  if (state.settings.playerMode === 'youtube') {
+    window.location.href = videoUrl(normalized.id);
+    return;
+  }
+
   frameShell.classList.toggle('shorts', normalized.kind === 'shorts');
   frame.src = `https://www.youtube.com/embed/${normalized.id}?autoplay=1&playsinline=1&controls=1&rel=0`;
-  upsertHistory(normalized);
   updateFavoriteButton();
   showScreen('player');
   window.setTimeout(() => {
@@ -632,7 +716,15 @@ function selectSearchMode(mode) {
   document.querySelectorAll('[data-search-mode]').forEach(button => {
     button.classList.toggle('active', button.dataset.searchMode === mode);
   });
-  if (searchInput.value.trim()) runSearch();
+  if (getSearchQuery()) runSearch();
+}
+
+function selectSearchOrder(order) {
+  state.searchOrder = order;
+  document.querySelectorAll('[data-search-order]').forEach(button => {
+    button.classList.toggle('active', button.dataset.searchOrder === order);
+  });
+  if (getSearchQuery()) runSearch();
 }
 
 function selectLibraryMode(mode) {
@@ -645,9 +737,36 @@ function selectLibraryMode(mode) {
 
 function saveSettings() {
   persistSettings();
-  setStatus(settingsStatus, 'Настройки сохранены');
+  setSettingsStatus('Настройки сохранены');
   toastMessage('Настройки сохранены');
   loadTrends();
+}
+
+function getSpeechRecognition() {
+  return window.SpeechRecognition || window.webkitSpeechRecognition;
+}
+
+function getVoiceSupportMessage() {
+  const hasSpeech = Boolean(getSpeechRecognition());
+  const hasMedia = Boolean(navigator.mediaDevices?.getUserMedia);
+  if (hasSpeech) {
+    return 'Голос: Web Speech доступен. Нажмите Голос и говорите.';
+  }
+  if (hasMedia) {
+    return 'Голос: микрофон есть, но Web Speech нет. Нужен backend для распознавания.';
+  }
+  return 'Голос: WebView очков не дает Web Speech/микрофон. Используйте быстрые кнопки или ввод.';
+}
+
+function setSettingsStatus(message) {
+  const auth = state.googleToken ? ' Google подключен.' : '';
+  setStatus(settingsStatus, `${message}${auth}`);
+}
+
+async function checkVoiceSupport() {
+  const message = getVoiceSupportMessage();
+  setSettingsStatus(message);
+  toastMessage(message);
 }
 
 function loadGoogleScript() {
@@ -669,7 +788,7 @@ function loadGoogleScript() {
 async function signInGoogle() {
   persistSettings();
   if (!state.settings.clientId) {
-    setStatus(settingsStatus, 'Добавьте Google OAuth Client ID');
+    setSettingsStatus('Добавьте Google OAuth Client ID или client_id в URL');
     toastMessage('Нужен Client ID');
     return;
   }
@@ -682,30 +801,29 @@ async function signInGoogle() {
       callback: tokenResponse => {
         if (tokenResponse?.access_token) {
           state.googleToken = tokenResponse.access_token;
-          setStatus(settingsStatus, 'Google подключен');
+          setSettingsStatus('Google подключен');
           toastMessage('Google подключен');
           loadTrends();
+        } else {
+          setSettingsStatus('Google не вернул access token');
         }
       }
     });
     tokenClient.requestAccessToken();
   } catch (error) {
-    setStatus(settingsStatus, 'Google вход недоступен в этом WebView');
+    setSettingsStatus('Google вход недоступен в этом WebView');
   }
 }
 
 function startVoiceSearch() {
-  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  const SpeechRecognition = getSpeechRecognition();
   const activeInput = getVisibleSearchInput();
   activeInput.focus({ preventScroll: true });
   activeInput.select();
   if (!SpeechRecognition) {
-    toastMessage('Поле активно. Используйте диктовку Meta AI или системную клавиатуру.');
-    const fallback = window.prompt('Голосовой API недоступен в этом браузере. Введите или продиктуйте запрос здесь:', activeInput.value);
-    if (fallback && fallback.trim()) {
-      syncSearchInputs(fallback.trim());
-      runSearch();
-    }
+    const message = getVoiceSupportMessage();
+    setStatus(searchStatus, message);
+    toastMessage('Голос недоступен в этом WebView');
     return;
   }
 
@@ -713,12 +831,20 @@ function startVoiceSearch() {
   recognition.lang = navigator.language?.startsWith('ru') ? 'ru-RU' : 'en-US';
   recognition.interimResults = false;
   recognition.maxAlternatives = 1;
+  toastMessage('Слушаю...');
   recognition.onresult = event => {
     const transcript = event.results?.[0]?.[0]?.transcript || '';
     syncSearchInputs(transcript);
     runSearch();
   };
-  recognition.onerror = () => toastMessage('Не удалось распознать голос');
+  recognition.onerror = event => {
+    const reason = event?.error ? `: ${event.error}` : '';
+    setStatus(searchStatus, `Не удалось распознать голос${reason}`);
+    toastMessage('Голос не распознан');
+  };
+  recognition.onend = () => {
+    if (!getSearchQuery()) setStatus(searchStatus, 'Голос остановлен');
+  };
   recognition.start();
 }
 
@@ -738,9 +864,11 @@ function bindEvents() {
   voiceButtonSearch.addEventListener('click', startVoiceSearch);
   refreshTrendsButton.addEventListener('click', loadTrends);
   openYouTubeSearchButton.addEventListener('click', openYouTubeSearch);
+  moreResultsButton.addEventListener('click', () => runSearch({ append: true }));
   clearHistoryButton.addEventListener('click', clearHistory);
   saveSettingsButton.addEventListener('click', saveSettings);
   googleButton.addEventListener('click', signInGoogle);
+  voiceCheckButton.addEventListener('click', checkVoiceSupport);
   backButton.addEventListener('click', goBack);
   settingsButton.addEventListener('click', () => {
     state.previousScreen = state.activeScreen;
@@ -756,6 +884,9 @@ function bindEvents() {
   });
   document.querySelectorAll('[data-search-mode]').forEach(button => {
     button.addEventListener('click', () => selectSearchMode(button.dataset.searchMode));
+  });
+  document.querySelectorAll('[data-search-order]').forEach(button => {
+    button.addEventListener('click', () => selectSearchOrder(button.dataset.searchOrder));
   });
   document.querySelectorAll('[data-library-mode]').forEach(button => {
     button.addEventListener('click', () => selectLibraryMode(button.dataset.libraryMode));
@@ -824,6 +955,9 @@ function init() {
   refreshFocusables();
   if (window.__ytgKeyLoadedFromUrl) {
     toastMessage('API key сохранен');
+  }
+  if (window.__ytgClientLoadedFromUrl) {
+    setSettingsStatus('Google Client ID сохранен из URL');
   }
 }
 

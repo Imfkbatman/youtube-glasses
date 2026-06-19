@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=600, height=600, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <meta name="theme-color" content="#050505" />
   <title>YouTube Glass</title>
-  <link rel="stylesheet" href="style.css?v=20260620-8" />
+  <link rel="stylesheet" href="style.css?v=20260620-11" />
 </head>
 <body>
   <main id="app" aria-live="polite">
@@ -65,8 +65,15 @@
         <button class="chip focusable" type="button" data-search-mode="shorts">Shorts</button>
       </div>
 
+      <div class="filter-row three" role="group" aria-label="Сортировка поиска">
+        <button class="chip focusable active" type="button" data-search-order="relevance">Лучшее</button>
+        <button class="chip focusable" type="button" data-search-order="date">Новое</button>
+        <button class="chip focusable" type="button" data-search-order="viewCount">Популярное</button>
+      </div>
+
       <div id="searchStatus" class="status-line"></div>
       <div id="searchResults" class="video-list" aria-label="Результаты поиска"></div>
+      <button id="moreResultsButton" class="wide-action focusable" type="button" hidden>Еще</button>
     </section>
 
     <section id="library" class="screen" data-screen="library">
@@ -114,12 +121,21 @@
           </select>
         </label>
 
+        <label class="setting-row split">
+          <span>Режим плеера</span>
+          <select id="playerModeSelect" class="focusable">
+            <option value="youtube">m.youtube</option>
+            <option value="embed">iframe</option>
+          </select>
+        </label>
+
         <label class="setting-row toggle">
           <span>Авто fullscreen</span>
           <input id="fullscreenToggle" class="focusable" type="checkbox" />
         </label>
 
         <button id="googleButton" class="wide-action focusable" type="button">Войти через Google</button>
+        <button id="voiceCheckButton" class="wide-action focusable" type="button">Проверить голос</button>
       </div>
 
       <div id="settingsStatus" class="status-line"></div>
@@ -147,6 +163,6 @@
     <div id="toast" class="toast" role="status" aria-live="polite"></div>
   </main>
 
-  <script src="app.js?v=20260620-8"></script>
+  <script src="app.js?v=20260620-11"></script>
 </body>
 </html>

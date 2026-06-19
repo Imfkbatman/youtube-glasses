@@ -128,6 +128,15 @@ button {
   display: block;
 }
 
+#settings {
+  overflow-y: auto;
+  scrollbar-width: none;
+}
+
+#settings::-webkit-scrollbar {
+  display: none;
+}
+
 #player {
   inset: 0;
   z-index: 8;
@@ -213,6 +222,10 @@ h1 {
   margin-bottom: 10px;
 }
 
+.filter-row.three {
+  grid-template-columns: 1fr 1fr 1fr;
+}
+
 .quick-searches {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
@@ -257,7 +270,16 @@ h1 {
 }
 
 #search .video-list {
-  height: 218px;
+  height: 158px;
+}
+
+#moreResultsButton {
+  height: 42px;
+  margin-top: 8px;
+}
+
+#moreResultsButton[hidden] {
+  display: none;
 }
 
 .video-list::-webkit-scrollbar {
@@ -403,6 +425,10 @@ h1 {
   border-color: rgba(77, 212, 255, .45);
   color: #e9faff;
   font-size: 18px;
+}
+
+.wide-action + .wide-action {
+  margin-top: 0;
 }
 
 .dock {

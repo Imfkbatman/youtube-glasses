@@ -11,6 +11,7 @@ Ray-Ban Meta Display YouTube Web App
 - поиск по ссылке, video ID и YouTube Data API;
 - главная страница с live-трендами YouTube при наличии API key;
 - режим Shorts с вертикальным плеером;
+- режим открытия видео через m.youtube для WebView очков;
 - запрос fullscreen после пользовательского жеста;
 - избранное и история просмотров в localStorage;
 - управление D-Pad, клавиатурой и свайпами;
