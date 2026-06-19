@@ -113,6 +113,7 @@ function consumeApiKeyFromUrl() {
   if (window.history?.replaceState) {
     window.history.replaceState(null, document.title, window.location.pathname);
   }
+  window.__ytgKeyLoadedFromUrl = true;
   return key;
 }
 
@@ -510,7 +511,7 @@ async function runSearch() {
       const haystack = `${video.title} ${video.channel}`.toLowerCase();
       return haystack.includes(query.toLowerCase());
     });
-    setStatus(searchStatus, 'Live-поиск недоступен. Можно открыть запрос в YouTube.');
+    setStatus(searchStatus, 'API key не найден. Откройте сайт через ссылку с ?key=...');
     renderVideoList(searchResults, localMatches, 'Нажмите YouTube для поиска на m.youtube.com');
     return;
   }
@@ -811,6 +812,9 @@ function init() {
   backButton.hidden = true;
   backButton.disabled = true;
   refreshFocusables();
+  if (window.__ytgKeyLoadedFromUrl) {
+    toastMessage('API key сохранен');
+  }
 }
 
 init();
