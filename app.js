@@ -643,23 +643,36 @@
   }
 
   // ==================== ON-SCREEN KEYBOARD ====================
-  // 10x4 grid. Each cell is one focusable key for predictable D-pad 2D nav.
-  // Row 3 last 3 cells are action keys: space, backspace, submit.
-  var KB_ROWS = [
-    ['1','2','3','4','5','6','7','8','9','0'],
-    ['q','w','e','r','t','y','u','i','o','p'],
-    ['a','s','d','f','g','h','j','k','l',"'"],
-    ['z','x','c','v','b','n','m','SPACE','BACK','GO'],
-  ];
+  // 10-column grid. Each cell is one focusable key for predictable D-pad nav.
+  var KB_LAYOUTS = {
+    en: [
+      ['1','2','3','4','5','6','7','8','9','0'],
+      ['q','w','e','r','t','y','u','i','o','p'],
+      ['a','s','d','f','g','h','j','k','l',"'"],
+      ['z','x','c','v','b','n','m','SPACE','LANG','BACK'],
+      ['.',',','?','!','-','_','/','@','CLEAR','GO'],
+    ],
+    ru: [
+      ['1','2','3','4','5','6','7','8','9','0'],
+      ['й','ц','у','к','е','н','г','ш','щ','з'],
+      ['х','ъ','ф','ы','в','а','п','р','о','л'],
+      ['д','ж','э','я','ч','с','м','и','т','ь'],
+      ['б','ю','ё','.',',','SPACE','LANG','BACK','CLEAR','GO'],
+    ],
+  };
   var kbBuffer = '';
-  var kbRendered = false;
+  var kbLanguage = 'ru';
+
+  function getKbRows() {
+    return KB_LAYOUTS[kbLanguage] || KB_LAYOUTS.en;
+  }
 
   function renderKeyboardGrid() {
-    if (kbRendered) return;
     var grid = document.getElementById('kb-grid');
     if (!grid) return;
     grid.innerHTML = '';
-    KB_ROWS.forEach(function (row, rIdx) {
+    grid.dataset.language = kbLanguage;
+    getKbRows().forEach(function (row, rIdx) {
       row.forEach(function (ch, cIdx) {
         var btn = document.createElement('button');
         btn.className = 'kb-key focusable';
@@ -673,6 +686,14 @@
           btn.classList.add('kb-action');
           btn.textContent = '⌫';
           btn.dataset.action = 'kb-backspace';
+        } else if (ch === 'CLEAR') {
+          btn.classList.add('kb-action');
+          btn.textContent = 'CLR';
+          btn.dataset.action = 'kb-clear';
+        } else if (ch === 'LANG') {
+          btn.classList.add('kb-action', 'kb-lang');
+          btn.textContent = kbLanguage === 'ru' ? 'EN' : 'RU';
+          btn.dataset.action = 'kb-lang';
         } else if (ch === 'GO') {
           btn.classList.add('kb-action', 'kb-submit');
           btn.textContent = '⏎';
@@ -685,7 +706,6 @@
         grid.appendChild(btn);
       });
     });
-    kbRendered = true;
   }
 
   function updateKbDisplay() {
@@ -710,6 +730,25 @@
     updateKbDisplay();
   }
 
+  function kbClear() {
+    kbBuffer = '';
+    updateKbDisplay();
+  }
+
+  function kbToggleLanguage() {
+    var current = document.activeElement;
+    var row = current && current.classList.contains('kb-key') ? current.dataset.row : '1';
+    var col = current && current.classList.contains('kb-key') ? current.dataset.col : '0';
+    kbLanguage = kbLanguage === 'ru' ? 'en' : 'ru';
+    renderKeyboardGrid();
+    updateKbDisplay();
+    var next = document.querySelector(
+      '#kb-grid .kb-key[data-row="' + row + '"][data-col="' + col + '"]'
+    ) || document.querySelector('#kb-grid .kb-key[data-row="1"][data-col="0"]');
+    if (next) next.focus();
+    showToast(kbLanguage === 'ru' ? 'Русская клавиатура' : 'English keyboard');
+  }
+
   function kbSubmit() {
     var q = kbBuffer.trim();
     if (!q) return;
@@ -730,8 +769,9 @@
 
   function kbMoveFocus(direction) {
     var current = document.activeElement;
-    var rows = KB_ROWS.length;
-    var cols = KB_ROWS[0].length;
+    var layoutRows = getKbRows();
+    var rows = layoutRows.length;
+    var cols = layoutRows[0].length;
     var row, col;
     if (current && current.classList.contains('kb-key')) {
       row = parseInt(current.dataset.row, 10);
@@ -800,6 +840,8 @@
       case 'kb-char': kbAppend(element.dataset.char || ''); break;
       case 'kb-space': kbAppend(' '); break;
       case 'kb-backspace': kbBackspace(); break;
+      case 'kb-clear': kbClear(); break;
+      case 'kb-lang': kbToggleLanguage(); break;
       case 'kb-submit': kbSubmit(); break;
       case 'kb-cancel': kbCancel(); break;
     }
@@ -907,7 +949,7 @@
           case 'Escape': kbCancel(); e.preventDefault(); return;
         }
         // Allow physical keyboard typing to work on desktop while keyboard screen is open
-        if (e.key.length === 1 && /^[\w\d\s'.,!?-]$/.test(e.key)) {
+        if (e.key.length === 1 && /^[\w\d\s'.,!?/@_-а-яёА-ЯЁ]$/.test(e.key)) {
           kbAppend(e.key.toLowerCase());
           e.preventDefault();
           return;
