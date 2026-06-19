@@ -3,30 +3,134 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=600, height=600, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="theme-color" content="#050505" />
   <title>YouTube Glass</title>
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-  <main id="app">
-    <section id="home" class="screen active">
-      <h1>YouTube Glass</h1>
-      <p class="hint">Вставь ID или ссылку YouTube и нажми Play</p>
+  <main id="app" aria-live="polite">
+    <header class="topbar">
+      <button id="backButton" class="nav-button focusable" type="button" aria-label="Назад">‹</button>
+      <div class="brand" aria-label="YouTube Glass">
+        <span class="brand-mark"></span>
+        <span>YouTube Glass</span>
+      </div>
+      <button id="settingsButton" class="nav-button focusable" type="button">Настройки</button>
+    </header>
 
-      <input id="videoInput" class="focusable" placeholder="YouTube link / video ID" autocomplete="off" />
-      <button id="playBtn" class="focusable">▶ Play</button>
-
-      <div class="quick">
-        <button class="focusable preset" data-id="dQw4w9WgXcQ">Test video</button>
-        <button id="openMobile" class="focusable">Open m.youtube</button>
+    <section id="home" class="screen active" data-screen="home">
+      <div class="search-strip">
+        <input id="searchInput" class="focusable" data-search-input type="search" placeholder="Видео, Shorts или ссылка" autocomplete="off" />
+        <button id="voiceButton" class="compact focusable" type="button">Голос</button>
+        <button id="searchButton" class="primary focusable" type="button">Поиск</button>
       </div>
 
-      <p class="small">Навигация: стрелки / D‑Pad / Neural Band. Enter — выбрать. Backspace/Esc — назад.</p>
+      <div class="section-title">
+        <h1>Тренды</h1>
+        <button id="refreshTrendsButton" class="compact focusable" type="button">Обновить</button>
+      </div>
+
+      <div id="trendStatus" class="status-line"></div>
+      <div id="trendGrid" class="video-list" aria-label="Тренды YouTube"></div>
     </section>
 
-    <section id="player" class="screen">
-      <iframe id="ytFrame" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe>
-      <button id="backBtn" class="focusable overlay">← Back</button>
+    <section id="search" class="screen" data-screen="search">
+      <div class="section-title">
+        <h1>Поиск</h1>
+        <button id="openYouTubeSearchButton" class="compact focusable" type="button">YouTube</button>
+      </div>
+
+      <div class="search-strip">
+        <input id="searchInputSearch" class="focusable" data-search-input type="search" placeholder="Видео, Shorts или ссылка" autocomplete="off" />
+        <button id="voiceButtonSearch" class="compact focusable" type="button">Голос</button>
+        <button id="searchButtonSearch" class="primary focusable" type="button">Поиск</button>
+      </div>
+
+      <div class="filter-row" role="group" aria-label="Фильтр поиска">
+        <button class="chip focusable active" type="button" data-search-mode="video">Видео</button>
+        <button class="chip focusable" type="button" data-search-mode="shorts">Shorts</button>
+      </div>
+
+      <div id="searchStatus" class="status-line"></div>
+      <div id="searchResults" class="video-list" aria-label="Результаты поиска"></div>
     </section>
+
+    <section id="library" class="screen" data-screen="library">
+      <div class="section-title">
+        <h1>Библиотека</h1>
+        <button id="clearHistoryButton" class="compact focusable" type="button">Очистить</button>
+      </div>
+
+      <div class="filter-row" role="group" aria-label="Библиотека">
+        <button class="chip focusable active" type="button" data-library-mode="history">История</button>
+        <button class="chip focusable" type="button" data-library-mode="favorites">Избранное</button>
+      </div>
+
+      <div id="libraryStatus" class="status-line"></div>
+      <div id="libraryList" class="video-list" aria-label="История и избранное"></div>
+    </section>
+
+    <section id="settings" class="screen" data-screen="settings">
+      <div class="section-title">
+        <h1>Настройки</h1>
+        <button id="saveSettingsButton" class="primary compact focusable" type="button">Сохранить</button>
+      </div>
+
+      <div class="settings-list">
+        <label class="setting-row">
+          <span>YouTube API key</span>
+          <input id="apiKeyInput" class="focusable" type="password" autocomplete="off" placeholder="Для живого поиска и трендов" />
+        </label>
+
+        <label class="setting-row">
+          <span>Google OAuth Client ID</span>
+          <input id="clientIdInput" class="focusable" type="text" autocomplete="off" placeholder="Для входа в Google" />
+        </label>
+
+        <label class="setting-row split">
+          <span>Регион трендов</span>
+          <select id="regionSelect" class="focusable">
+            <option value="US">US</option>
+            <option value="RU">RU</option>
+            <option value="GB">GB</option>
+            <option value="DE">DE</option>
+            <option value="FR">FR</option>
+            <option value="TR">TR</option>
+            <option value="IN">IN</option>
+          </select>
+        </label>
+
+        <label class="setting-row toggle">
+          <span>Авто fullscreen</span>
+          <input id="fullscreenToggle" class="focusable" type="checkbox" />
+        </label>
+
+        <button id="googleButton" class="wide-action focusable" type="button">Войти через Google</button>
+      </div>
+
+      <div id="settingsStatus" class="status-line"></div>
+    </section>
+
+    <section id="player" class="screen" data-screen="player" aria-label="Плеер">
+      <div id="frameShell" class="frame-shell">
+        <iframe id="ytFrame" title="YouTube player" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe>
+      </div>
+
+      <div class="player-bar">
+        <button id="playerBackButton" class="player-control focusable" type="button">Назад</button>
+        <button id="favoriteButton" class="player-control focusable" type="button">Сохранить</button>
+        <button id="fullscreenButton" class="player-control focusable" type="button">Экран</button>
+        <button id="openVideoButton" class="player-control focusable" type="button">YouTube</button>
+      </div>
+    </section>
+
+    <nav class="dock" aria-label="Основная навигация">
+      <button class="dock-button focusable active" type="button" data-route="home">Тренды</button>
+      <button class="dock-button focusable" type="button" data-route="search">Поиск</button>
+      <button class="dock-button focusable" type="button" data-route="library">Библиотека</button>
+    </nav>
+
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
   </main>
 
   <script src="app.js"></script>

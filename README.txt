@@ -1,11 +1,33 @@
 Ray-Ban Meta Display YouTube Web App
 
-Как запустить:
+Запуск:
 1. Залей папку на HTTPS-хостинг: GitHub Pages, Netlify или Vercel.
-2. В Meta AI app открой Web Apps → Connect a Web App.
+2. В Meta AI app открой Web Apps -> Connect a Web App.
 3. App name: YouTube Glass
 4. URL: ссылка на index.html или корень сайта.
 5. Открой приложение на очках.
 
-Примечание:
-Это простой интерфейс под 600x600 экран и D-Pad/Neural Band. Он не ставит YouTube APK и не обходит защиту.
+Что добавлено:
+- поиск по ссылке, video ID и YouTube Data API;
+- главная страница с live-трендами YouTube при наличии API key;
+- режим Shorts с вертикальным плеером;
+- запрос fullscreen после пользовательского жеста;
+- избранное и история просмотров в localStorage;
+- управление D-Pad, клавиатурой и свайпами;
+- подготовка Google OAuth через Google OAuth Client ID;
+- голосовой поиск через Web Speech API, если WebView его поддерживает.
+
+Настройка YouTube Data API:
+1. Создай API key в Google Cloud Console.
+2. Включи YouTube Data API v3.
+3. Вставь ключ в настройках приложения.
+
+Настройка Google входа:
+1. Создай OAuth Client ID для Web application в Google Cloud Console.
+2. Добавь HTTPS-домен приложения в Authorized JavaScript origins.
+3. Вставь Client ID в настройках приложения.
+
+Ограничения:
+- Google OAuth и живой YouTube API требуют проекта Google Cloud.
+- Голосовой ввод зависит от WebView на очках. Если Web Speech API недоступен, можно сфокусировать поле поиска и использовать системную диктовку Meta AI.
+- Приложение не устанавливает YouTube APK и не обходит ограничения YouTube.
